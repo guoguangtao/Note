@@ -49,7 +49,7 @@
 
     在 `block` 里面输出的值，除了自动变量，其他变量的值都发生了改变，即使自动变量（`auto_num`）在 `block` 外面经过 `++` ，但是在 `block` 里面值还是没有发生改变，而且在 `block` 中为什么不能对自动变量进行 `++` 操作（除非使用 `__block`）
 
-    为了弄清楚这两个疑问，用 `clang` 转换成 `C++/C` 代码出来分析分析
+    为了弄清楚这两个疑问，用 `clang` 转换成 `C++/C` 代码出来分析
 
     ```
     xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc 文件名
@@ -209,7 +209,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 
 * `__cself->static_num` 和 `__cself->auto_num`
 
-    `__main_block_impl_0` 中有两个属性 `static_num`、 `auto_num`，其中 `static_num` 是一个指针变量，这里将 static_num 指向 `__main_block_impl_0` 中的 `static_num`，并且使用 （`*static_num`）进行自增操作，从而修改了 `static_num` 里面的值(地址传递，可以修改指向该空间里面的值)；`auto_num` 只是一个 `int` 类型的基本数据，它只是一个值，所以很好理解，为什么 `auto_num` 在 `block` 中输出仍然是 `3`，而不是 `4`，因为一开始创建 `block` 到时候，`block` 就已经将 `4` 这个值捕获到内部结构中的 `auto_num`去了，而 `static_num` 是一个指针变量，指向了 `static_num` 所在的这块存储空间，通过这个存储空间地址从而修改了这块空间地址的值。
+    `__main_block_impl_0` 中有两个属性 `static_num`、 `auto_num`，其中 `static_num` 是一个指针变量，这里将 static_num 指向 `__main_block_impl_0` 中的 `static_num`，并且使用 （`*static_num`）进行自增操作，从而修改了 `static_num` 里面的值(地址传递，可以修改指向该空间里面的值)；`auto_num` 只是一个 `int` 类型的基本数据，它只是一个值，所以很好理解，为什么 `auto_num` 在 `block` 中输出仍然是 `3`，而不是 `4`，因为一开始创建 `block` 到时候，`block` 就已经将 `3` 这个值捕获到内部结构中的 `auto_num`去了，而 `static_num` 是一个指针变量，指向了 `static_num` 所在的这块存储空间，通过这个存储空间地址从而修改了这块空间地址的值。
 
 * `global_num` 和 `static_global_num`
     由于这两个是全局变量，作用域的原因，在 `block` 中可以直接被修改，存在全局区
