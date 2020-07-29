@@ -478,7 +478,83 @@ Block[90411:1232567] myBlock = <__NSStackBlock__: 0x7ffeefbff550>, copyBlock = <
 Program ended with exit code: 0
 ```
 > 经过打印输出发现 `myBlock` 始终在 **栈区** ,经过 `copy` 操作的 `copyBlock` 则是在 **堆区**
-> `myBlock` 未经过 `copy` 操作时 `auto_num` 的内存地址跟初始值的内存地址一致,没有发生改变;经过 `copy` 操作之后,再次调用 `myBlock` 发现 `auto_num` 的地址已经发生了改变而且跟 `copyBlock` 的地址相差 **72**,所以猜测此时的 `auto_num` 已经经过 `copy` 复制到**堆区**上了.
+> `myBlock` 未经过 `copy` 操作时 `auto_num` 的内存地址跟初始值的内存地址一致,没有发生改变;经过 `copy` 操作之后,再次调用 `myBlock` 发现 `auto_num` 的地址已经发生了改变而且跟 `copyBlock` 的地址相差 **72**,所以猜测此时的 `auto_num` 已经经过 `copy` 复制到**堆区**上了,`myBlock`中的 `auto_num` 中的 `__forwarding` 这时候指向了堆区上的存储空间,所以导致 `auto_num` 本身的内存地址值和 `__forwarding` 指向的存储空间不一致.
+
+下面来证实一下上面的猜想:
+
+```Objective-C
+/// block 的基本结构
+struct __block_impl {
+    void *isa;
+    int Flags;
+    int Reserved;
+    void *FuncPtr;
+};
+/// __block 修饰的 auto_num 变量结构
+struct __Block_byref_auto_num_0 {
+    void *__isa;
+    struct __Block_byref_auto_num_0 *__forwarding;
+    int __flags;
+    int __size;
+    int auto_num;
+};
+/// block 中的 Desc 结构
+struct __main_block_desc_0 {
+    size_t reserved;
+    size_t Block_size;
+    void (*copy)(void);
+    void (*dispose)(void);
+};
+/// block 的结构
+struct __main_block_impl_0 {
+    struct __block_impl impl;
+    struct __main_block_desc_0* Desc;
+    struct __Block_byref_auto_num_0 *auto_num; // by ref
+};
+
+int main(int argc, const char * argv[]) {
+    
+    // 设置一个 __block 自动变量
+    __block int auto_num = 1;
+    // 输出初始化时 auto_num 的内存地址
+    NSLog(@"auto_num 初始值 %d, auto_num 的初始内存地址为:%p", auto_num, &auto_num);
+    // 创建一个 myBlock ,此时的 myBlock 应该是在栈上的
+    void (^myBlock)(NSString *string) = ^(NSString *string) {
+        auto_num++;
+        NSLog(@"Block 内 %@ auto_num = %d, auto_num 的内存地址为:%p", string, auto_num, &auto_num);
+    };
+    // auto_num 自增运算
+    auto_num++;
+    // myBlock 没有经过 copy 操作是,调用 myBlock 方法,输出 auto_num 的值和内存地址
+    myBlock(@"myBlock 未经过 copy 操作");
+    // 将未经过 copy 操作的 myBlock 赋值给 __main_block_impl_0 类型的结构体,查看数据结构
+    struct __main_block_impl_0 *noCopyMyBlock = (__bridge struct __main_block_impl_0 *)myBlock;
+    
+    NSLog(@"------ Copy 操作 ------");
+    // 将 myBlock 经过 copy 操作,赋值给 copyBlock,此时 myBlock 还是在栈区上,而 copyBlock 是在堆区上
+    void (^copyBlock)(NSString *string) = [myBlock copy];
+    // myBlock 经过 copy 操作是,调用 myBlock 方法,输出 auto_num 的值和内存地址
+    myBlock(@"myBlock 经过 copy 操作");
+    // 调用 copyBlock
+    copyBlock(@"copyBlock");
+    // 打印 myBlock 和 copyBlock 类型
+    NSLog(@"myBlock = %@, copyBlock = %@", myBlock, copyBlock);
+    // 将经过 copy 操作的 myBlock 赋值给 __main_block_impl_0 类型的结构体,查看数据结构
+    struct __main_block_impl_0 *myBlockImpl = (__bridge struct __main_block_impl_0 *)myBlock;
+    // 将经过 copy 操作的所得的 copyBlock 赋值给 __main_block_impl_0 类型的结构体,查看数据结构
+    struct __main_block_impl_0 *copyBlockImpl = (__bridge struct __main_block_impl_0 *)copyBlock;
+    
+    NSLog(@"%s", __func__);
+    
+    return 0;
+}
+```
+
+![未经过Copy查看结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200729224627.png)
+
+![经过 copy 操作的myBlock结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200729225055.png)
+
+![经过copy操作得到的copyBlock结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200729225154.png)
 
 #### 2.2 对象变量
 
