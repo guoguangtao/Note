@@ -1,148 +1,148 @@
 [toc]
 
-#### Block 捕获外部变量
+# Block 捕获外部变量
 
-##### 4种变量类型
+## 4种变量类型
 
 * 自动变量
 * 静态变量
 * 静态全局变量
 * 全局变量
 
-    ```Objective-C
-    int global_num = 1; // 全局变量
-    static int static_global_num = 2; // 静态全局变量
+```Objective-C
+int global_num = 1; // 全局变量
+static int static_global_num = 2; // 静态全局变量
 
-    int main(int argc, const char * argv[]) {
+int main(int argc, const char * argv[]) {
         
-        int auto_num = 3; // 自动变量
-        static int static_num = 4; // 静态变量
-        
-        void (^block)(void) = ^{
-            global_num++;
-            static_global_num++;
-            // auto_num++; // 自动变量，如果没有加上 __block 是无法修改变量值的，
-            static_num++;
-            NSLog(@"Block内 global_num = %d, static_global_num = %d, auto_num = %d, static_num = %d", global_num, static_global_num, auto_num, static_num);
-        };
-        
+    int auto_num = 3; // 自动变量
+    static int static_num = 4; // 静态变量
+    
+    void (^block)(void) = ^{
         global_num++;
         static_global_num++;
-        auto_num++;
+        // auto_num++; // 自动变量，如果没有加上 __block 是无法修改变量值的，
         static_num++;
-        
-        NSLog(@"Block外 global_num = %d, static_global_num = %d, auto_num = %d, static_num = %d", global_num, static_global_num, auto_num, static_num);
-        
-        block();
-        
-        return 0;
+        NSLog(@"Block内 global_num = %d, static_global_num = %d, auto_num = %d, static_num = %d", global_num, static_global_num, auto_num, static_num);
+    };
+    
+    global_num++;
+    static_global_num++;
+    auto_num++;
+    static_num++;
+    
+    NSLog(@"Block外 global_num = %d, static_global_num = %d, auto_num = %d, static_num = %d", global_num, static_global_num, auto_num, static_num);
+    
+    block();
+    
+    return 0;
+}
+```
+
+输出结果
+
+```objective-c
+2020-07-28 14:32:34.706529+0800 Block[26862:304493] Block外 global_num = 2, static_global_num = 3, auto_num = 4, static_num = 5
+2020-07-28 14:32:34.707679+0800 Block[26862:304493] Block内 global_num = 3, static_global_num = 4, auto_num = 3, static_num = 6
+Program ended with exit code: 0
+```
+
+在 `block` 里面输出的值，除了自动变量，其他变量的值都发生了改变，即使自动变量（`auto_num`）在 `block` 外面经过 `++` ，但是在 `block` 里面值还是没有发生改变，而且在 `block` 中为什么不能对自动变量进行 `++` 操作（除非使用 `__block`）
+
+为了弄清楚这两个疑问，用 `clang` 转换成 `C++/C` 代码出来分析
+
+```
+xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc 文件名
+```
+
+`C++/C` 代码经过整理如下：
+
+```C++
+int global_num = 1;
+static int static_global_num = 2;
+
+/// Block 的基本结构
+struct __block_impl {
+    void *isa;
+    int Flags;
+    int Reserved;
+    void *FuncPtr;
+};
+
+/// block结构
+struct __main_block_impl_0 {
+    struct __block_impl impl; // block 基本结构
+    struct __main_block_desc_0* Desc;
+    int *static_num; // 静态变量，这里是一个指针变量
+    int auto_num; // 自动变量
+    /// 构造方法
+    ///
+    /// @param fp Block方法的实现 （将__main_block_func_0传入 impl的FuncPtr）
+    /// @param desc __main_block_desc_0 （将 __main_block_desc_0_DATA 传入 desc）
+    /// @param _static_num 静态变量地址值 （将外部静态变量 _static_num 的地址传入 static_num）
+    /// @param _auto_num 自动变量值（这里是值，不是地址值）
+    /// @param flags
+    __main_block_impl_0(void *fp,
+                        struct __main_block_desc_0 *desc,
+                        int *_static_num,
+                        int _auto_num,
+                        int flags=0) : static_num(_static_num), auto_num(_auto_num) {
+        impl.isa = &_NSConcreteStackBlock; // block 基本机构isa 类型
+        impl.Flags = flags;
+        impl.FuncPtr = fp; // 函数指针，block实现方法，调用block实际上是通过调用 funcPtr 函数
+        Desc = desc;
     }
-    ```
+};
 
-    输出结果
+/// block 方法内部的实现
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+    int *static_num = __cself->static_num; // bound by copy
+    int auto_num = __cself->auto_num; // bound by copy
+    // 全局变量的自增运算
+    global_num++;
+    // 静态全局变量的自增运算
+    static_global_num++;
+    // 静态变量的自增运算
+    (*static_num)++;
+    // OC 代码输出
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_12374b_mi_0, global_num, static_global_num, auto_num, (*static_num));
+}        
 
-    ```objective-c
-    2020-07-28 14:32:34.706529+0800 Block[26862:304493] Block外 global_num = 2, static_global_num = 3, auto_num = 4, static_num = 5
-    2020-07-28 14:32:34.707679+0800 Block[26862:304493] Block内 global_num = 3, static_global_num = 4, auto_num = 3, static_num = 6
-    Program ended with exit code: 0
-    ```
-
-    在 `block` 里面输出的值，除了自动变量，其他变量的值都发生了改变，即使自动变量（`auto_num`）在 `block` 外面经过 `++` ，但是在 `block` 里面值还是没有发生改变，而且在 `block` 中为什么不能对自动变量进行 `++` 操作（除非使用 `__block`）
-
-    为了弄清楚这两个疑问，用 `clang` 转换成 `C++/C` 代码出来分析
-
-    ```
-    xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc 文件名
-    ```
-
-    `C++/C` 代码经过整理如下：
-
-    ```C++
-    int global_num = 1;
-    static int static_global_num = 2;
-
-    /// Block 的基本结构
-    struct __block_impl {
-        void *isa;
-        int Flags;
-        int Reserved;
-        void *FuncPtr;
-    };
-
-    /// block结构
-    struct __main_block_impl_0 {
-        struct __block_impl impl; // block 基本结构
-        struct __main_block_desc_0* Desc;
-        int *static_num; // 静态变量，这里是一个指针变量
-        int auto_num; // 自动变量
-        /// 构造方法
-        ///
-        /// @param fp Block方法的实现 （将__main_block_func_0传入 impl的FuncPtr）
-        /// @param desc __main_block_desc_0 （将 __main_block_desc_0_DATA 传入 desc）
-        /// @param _static_num 静态变量地址值 （将外部静态变量 _static_num 的地址传入 static_num）
-        /// @param _auto_num 自动变量值（这里是值，不是地址值）
-        /// @param flags
-        __main_block_impl_0(void *fp,
-                            struct __main_block_desc_0 *desc,
-                            int *_static_num,
-                            int _auto_num,
-                            int flags=0) : static_num(_static_num), auto_num(_auto_num) {
-            impl.isa = &_NSConcreteStackBlock; // block 基本机构isa 类型
-            impl.Flags = flags;
-            impl.FuncPtr = fp; // 函数指针，block实现方法，调用block实际上是通过调用 funcPtr 函数
-            Desc = desc;
-        }
-    };
-
-    /// block 方法内部的实现
-    static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
-        int *static_num = __cself->static_num; // bound by copy
-        int auto_num = __cself->auto_num; // bound by copy
-        // 全局变量的自增运算
-        global_num++;
-        // 静态全局变量的自增运算
-        static_global_num++;
-        // 静态变量的自增运算
-        (*static_num)++;
-        // OC 代码输出
-        NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_12374b_mi_0, global_num, static_global_num, auto_num, (*static_num));
-    }        
-
-    /// __main_block_impl_0 结构体中的 Desc 数据结构体
-    static struct __main_block_desc_0 {
-    size_t reserved;
-    size_t Block_size;
-    } __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+/// __main_block_impl_0 结构体中的 Desc 数据结构体
+static struct __main_block_desc_0 {
+size_t reserved;
+size_t Block_size;
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
 
 
-    /// Main 函数入口
-    int main(int argc, const char * argv[]) {
+/// Main 函数入口
+int main(int argc, const char * argv[]) {
 
-        int auto_num = 3;
-        static int static_num = 4;
-        
-        // block的创建，一个 __main_block_impl_0 的结构体，初始化传入了 __main_block_func_0、&__main_block_desc_0_DATA、&static_num、auto_num 这些参数进去
-        void (*block)(void) = &__main_block_impl_0(__main_block_func_0, &__main_block_desc_0_DATA, &static_num, auto_num);
-        // block 外全局变量的自增运算
-        global_num++;
-        // block 外静态全局变量的自增运算
-        static_global_num++;
-        // block 外自动变量的自增运算
-        auto_num++;
-        // block 外静态变量的自增运算
-        static_num++;
-        // block 外输出
-        NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_12374b_mi_1, global_num, static_global_num, auto_num, static_num);
-        // 调用 block 内部的 FuncPtr 方法
-        ((void (*)(__block_impl *))((__block_impl *)block)->FuncPtr)((__block_impl *)block);
+    int auto_num = 3;
+    static int static_num = 4;
+    
+    // block的创建，一个 __main_block_impl_0 的结构体，初始化传入了 __main_block_func_0、&__main_block_desc_0_DATA、&static_num、auto_num 这些参数进去
+    void (*block)(void) = &__main_block_impl_0(__main_block_func_0, &__main_block_desc_0_DATA, &static_num, auto_num);
+    // block 外全局变量的自增运算
+    global_num++;
+    // block 外静态全局变量的自增运算
+    static_global_num++;
+    // block 外自动变量的自增运算
+    auto_num++;
+    // block 外静态变量的自增运算
+    static_num++;
+    // block 外输出
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_12374b_mi_1, global_num, static_global_num, auto_num, static_num);
+    // 调用 block 内部的 FuncPtr 方法
+    ((void (*)(__block_impl *))((__block_impl *)block)->FuncPtr)((__block_impl *)block);
 
-        return 0;
-    }   
-    ```
+    return 0;
+}   
+```
 
-##### 变量捕获 clang 代码解析
+### 变量捕获 clang 代码解析
 
-###### 1.`main` 函数
+#### 1.`main` 函数
 ```C++
 void (*block)(void) = &__main_block_impl_0(__main_block_func_0, &__main_block_desc_0_DATA, &static_num, auto_num);
 ```
@@ -154,7 +154,7 @@ void (*block)(void) = &__main_block_impl_0(__main_block_func_0, &__main_block_de
 ```
 调用 `block`，实际上是通过当前 `block` （__block_impl结构体）中的  `FuncPtr` 方法
 
-###### 2.`__main_block_impl_0` 结构体
+#### 2.`__main_block_impl_0` 结构体
 
 ```C++
 /// block结构
@@ -184,7 +184,7 @@ struct __main_block_impl_0 {
 ```
 通过构造方法（跟结构体同名的方法）将传入的 `*fp`(方法地址)赋值给了 `impl.FuncPtr`,在 `main` 函数中调用 `block` 时，就是通过 调用 `impl.Funcptr` 的方式.
 
-###### 3.`__main_block_func_0` 结构体
+#### 3.`__main_block_func_0` 结构体
 
 ```C++
 /// block 方法内部的实现
@@ -216,11 +216,149 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 
     ![内存分布区](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200728201852.png)
 
-##### 总结
+## `Block` 改变变量的 2 种方式
+### 1.传递内存地址指针到 `Block` 中
+
+```Objective-c
+int main(int argc, const char * argv[]) {
+    
+    NSMutableString *mutableString = [NSMutableString stringWithString:@"Block内存地址传递（地址捕获）"];
+    void (^block)(void) = ^{
+        [mutableString appendString:@", Block根据内存地址传递修改指向该内存地址空间的值"];
+        NSLog(@"block 内 :%@, 内存地址:%p", mutableString, mutableString);
+    };
+    NSLog(@"block 前 :%@, 内存地址:%p", mutableString, mutableString);
+    block();
+    NSLog(@"block 后 :%@, 内存地址:%p", mutableString, mutableString);
+}
+```
+
+输出结果
+
+![传递内存地址到Block中修改变量](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200729100302.png)
+
+经过 `clang` 代码转换
+
+```C++
+/// block的结构
+struct __main_block_impl_0 {
+    struct __block_impl impl;
+    struct __main_block_desc_0* Desc;
+    NSMutableString *mutableString; // 捕获外部变量的指针变量
+    
+    /*
+    * __main_block_impl_0 的构造方法
+    * @param fp Block实现方法指针，在这里是 __main_block_func_0 方法
+    * @param desc block描述，在这里是 __main_block_desc_0_DATA（__main_block_desc_0 类型的结构体）
+    * @param _mutableString block捕获外部变量的字符串
+    * @param flags 默认值为0，此处传入的是 570425344
+    */
+    __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, NSMutableString *_mutableString, int flags=0) : mutableString(_mutableString) {
+        impl.isa = &_NSConcreteStackBlock; // block的类型，
+        impl.Flags = flags;
+        impl.FuncPtr = fp; // block的实现方法
+        Desc = desc;
+    }
+};
+
+/// block的实现方法
+/// @param __cself 当前block对象
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+    // 根据内存分配的原理，block最开始的地址就是内部第一个变量的地址，也就是 __cself 的地址同时也是内部变量 impl 的地址，所以这里直接使用 __cself 取得 mutableString
+    NSMutableString *mutableString = __cself->mutableString; // bound by copy
+    // 对可变字符串进行字符串拼接
+    objc_msgSend(mutableString, sel_registerName("appendString:"), &__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_b8880d_mi_1);
+    // 输出
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_b8880d_mi_2, mutableString, mutableString);
+}
+
+/// Block copy方法
+/// @param dst
+/// @param src
+static void __main_block_copy_0(struct __main_block_impl_0* dst, struct __main_block_impl_0* src) {
+    // 系统自己调用，不需要自己调用，在这里看情况是否需要进行引数计数器+1
+    _Block_object_assign((void*)&dst->mutableString, (void*)src->mutableString, 3/*BLOCK_FIELD_IS_OBJECT*/);
+}
+
+/// Block的释放方法（析构方法）
+/// @param src block
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {
+    _Block_object_dispose((void*)src->mutableString, 3/*BLOCK_FIELD_IS_OBJECT*/);
+}
+
+/// 描述
+static struct __main_block_desc_0 {
+    size_t reserved;
+    size_t Block_size;
+    void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+    void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+int main(int argc, const char * argv[]) {
+    
+    // 创建一个可变字符串
+    NSMutableString *mutableString = objc_msgSend(objc_getClass("NSMutableString"), sel_registerName("stringWithString:"), &__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_b8880d_mi_0);
+    // block 的底层实现方式 __main_block_impl_0 类型
+    void (*block)(void) = ((void (*)())&__main_block_impl_0(__main_block_func_0, &__main_block_desc_0_DATA, mutableString, 570425344));
+    // 输出日志
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_b8880d_mi_3, mutableString, mutableString);
+    // 调用Block的实现方法，将当前 block 作为参数传入到 __main_block_func_0 静态方法中
+    ((void (*)(__block_impl *))((__block_impl *)block)->FuncPtr)((__block_impl *)block);
+    // 输出日志
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_b8880d_mi_4, mutableString, mutableString);
+}
+```
+在这里相比之前 `clang` 的代码，会发现多了两个方法 `__main_block_copy_0` 、`__main_block_dispose_0`,这两个方法都被传入到了 `__main_block_desc_0` 这样的结构体中。关于 `__main_block_copy_0` 和 `__main_block_dispose_0` 在后面讲解。
+
+### 2.改变存储区方式(`__block` 方式)
+
+研究 __block 从以下两点进行研究
+1. **普通非对象变量(基本数据类型)**
+2. **对象变量**
+
+#### 2.1 普通非对象变量(基本数据类型)
+
+```Objective-c
+int main(int argc, const char * argv[]) {
+    
+    __block int auto_num = 1;
+    
+    void (^myBlock)(void) = ^{
+        auto_num++;
+        NSLog(@"Block 外 auto_num = %d, auto_num 的内存地址为:%p", auto_num, &auto_num);
+    };
+    
+    auto_num++;
+    NSLog(@"Block 外 auto_num = %d, auto_num 的内存地址为:%p", auto_num, &auto_num);
+    myBlock();
+}
+```
+
+输出结果:
+
+```
+2020-07-29 11:29:23.296237+0800 Block[79099:1030085] Block 外 auto_num = 2, auto_num 的内存地址为:0x10070c8b8
+2020-07-29 11:29:23.296752+0800 Block[79099:1030085] Block 外 auto_num = 3, auto_num 的内存地址为:0x10070c8b8
+Program ended with exit code: 0
+```
+
+经过   `clang` 代码如下:
+
+```C++
+
+```
+
+
+#### 2.2 对象变量
+
+
+
+## 总结
 
 全局变量、静态全局变量因为作用域的原因，都是放在全局区中，所以在 block 内部可以直接修改；
 静态变量是通过地址捕获进去的，通过修改该空间的值也能直接修改；
 自动变量是通过 **值传递** 进行捕获，传入进去就是一个数值，所以无法修改
+
 
 
 
