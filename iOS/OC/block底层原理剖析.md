@@ -322,10 +322,11 @@ int main(int argc, const char * argv[]) {
 int main(int argc, const char * argv[]) {
     
     __block int auto_num = 1;
+    NSLog(@"auto_num 初始值 %d, auto_num 的初始内存地址为:%p", auto_num, &auto_num);
     
     void (^myBlock)(void) = ^{
         auto_num++;
-        NSLog(@"Block 外 auto_num = %d, auto_num 的内存地址为:%p", auto_num, &auto_num);
+        NSLog(@"Block 内 auto_num = %d, auto_num 的内存地址为:%p", auto_num, &auto_num);
     };
     
     auto_num++;
@@ -336,18 +337,148 @@ int main(int argc, const char * argv[]) {
 
 输出结果:
 
-```
-2020-07-29 11:29:23.296237+0800 Block[79099:1030085] Block 外 auto_num = 2, auto_num 的内存地址为:0x10070c8b8
-2020-07-29 11:29:23.296752+0800 Block[79099:1030085] Block 外 auto_num = 3, auto_num 的内存地址为:0x10070c8b8
+```Objective-c
+2020-07-29 14:01:05.941034+0800 Block[85215:1119239] auto_num 初始值 1, auto_num 的初始内存地址为:0x7ffeefbff5a8
+2020-07-29 14:01:05.941859+0800 Block[85215:1119239] Block 外 auto_num = 2, auto_num 的内存地址为:0x10060c8f8
+2020-07-29 14:01:05.941962+0800 Block[85215:1119239] Block 内 auto_num = 3, auto_num 的内存地址为:0x10060c8f8
 Program ended with exit code: 0
 ```
 
 经过   `clang` 代码如下:
 
 ```C++
+/// 外部普通非对象变量在底层实现的结构
+struct __Block_byref_auto_num_0 {
+    void *__isa; // isa 指针
+    __Block_byref_auto_num_0 *__forwarding; // 一个指向自己本身的指针变量
+    int __flags; // 标记flag
+    int __size; // 大小
+    int auto_num; // 变量值,跟外部普通非对象变量名同名
+};
 
+/// block 底层结构
+struct __main_block_impl_0 {
+    struct __block_impl impl;
+    struct __main_block_desc_0* Desc;
+    __Block_byref_auto_num_0 *auto_num; // by ref
+    /// 将 传入的 auto_num 的 __forwarding 赋值给 auto_num 指针变量
+    __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, __Block_byref_auto_num_0 *_auto_num, int flags=0) : auto_num(_auto_num->__forwarding) {
+        impl.isa = &_NSConcreteStackBlock;
+        impl.Flags = flags;
+        impl.FuncPtr = fp;
+        Desc = desc;
+    }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+    // 拿到 __Block_byref_auto_num_0 类型的 auto_num 变量
+    __Block_byref_auto_num_0 *auto_num = __cself->auto_num; // bound by ref
+    // 自增运算,使用的__forwarding去获取auto_num这个值
+    (auto_num->__forwarding->auto_num)++;
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_89b0e5_mi_1, (auto_num->__forwarding->auto_num), &(auto_num->__forwarding->auto_num));
+}
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {
+    _Block_object_assign((void*)&dst->auto_num, (void*)src->auto_num, 8/*BLOCK_FIELD_IS_BYREF*/);
+}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {
+    _Block_object_dispose((void*)src->auto_num, 8/*BLOCK_FIELD_IS_BYREF*/);
+}
+
+static struct __main_block_desc_0 {
+    size_t reserved;
+    size_t Block_size;
+    void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+    void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+int main(int argc, const char * argv[]) {
+    // __block int auto_num = 1 转换成了一个 __Block_byref_auto_num_0 类型的结构体( C++ 中也可以称为对象),并且将 auto_num 的值传入到 auto_num 中,本身的地址传入到 __forwarding 指针变量
+    __attribute__((__blocks__(byref))) __Block_byref_auto_num_0 auto_num = {(void*)0,(__Block_byref_auto_num_0 *)&auto_num, 0, sizeof(__Block_byref_auto_num_0), 1};
+    // 输出还未创建 block 是 auto_num 的值和内存地址,都是通过 __forwarding 这个指针变量去取的
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_89b0e5_mi_0, (auto_num.__forwarding->auto_num), &(auto_num.__forwarding->auto_num));
+    // 创建 block,这里 auto_num 传入进去的是一个地址值,也就是 auto_num 指向的内存空间的地址值
+    void (*myBlock)(void) = ((void (*)())&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, (__Block_byref_auto_num_0 *)&auto_num, 570425344));
+    // auto_num 自增运算
+    (auto_num.__forwarding->auto_num)++;
+    // 输出 auto_num 变量
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_89b0e5_mi_2, (auto_num.__forwarding->auto_num), &(auto_num.__forwarding->auto_num));
+    // 调用 block
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)->FuncPtr)((__block_impl *)myBlock);
+}
 ```
 
+从上面转换的代码中,可以看到 `__block` 修饰的 `auto_num` 变量被转换成了一个 `__Block_byref_auto_num_0` 类型的结构体,这个结构体里面有 `5` 个成员变量
+
+```C++
+struct __Block_byref_auto_num_0 {
+    void *__isa; // isa 指针
+    __Block_byref_auto_num_0 *__forwarding; // 一个指向自己本身的指针变量
+    int __flags; // 标记flag
+    int __size; // 大小
+    int auto_num; // 变量值,跟外部普通非对象变量名同名
+};
+```
+
+从转换出来代码中,可以看到对 `auto_num` 进行修改都是通过 `__forwarding` 这个指针变量去获取到 `auto_num` 变量值,而不是直接通过 `__Block_byref_auto_num_0` 这个类型直接获取到 `auto_num` 这个变量值.
+
+**为什么要这么操作呢?**
+
+##### 2.1.1 `__forwarding` 指针
+
+提出疑问:
+1. 为什么要通过 `__forwarding` 这样的一个指针变量去获取变量值
+2. 初始化时传入的是自己的地址,是不是 `__fowarding` 这个指针在后期会发生改变,所以才使用 `__forwarding` 去获取到变量值
+
+为了研究这个 `__forwarding` 指针变量,特意在创建 `__block` 之后打印了 `__block` 变量的初始内存地址,结果发现创建`Block` 之后, `__block` 变量内存地址值跟初始内存地址不一样.
+
+> 一开始 `__block auto_num` 的内存地址是 `0x7ffeefbff5a8`
+> 创建 `Block` 之后 `__block auto_num` 的内存地址变成了 `0x10060c8f8`
+> 猜想:一开始创建的 `__block auto_num` 变量是存储到**栈区**的,经过`Block`的捕获到了**堆区**,因为在这里发现初始地址比较大(高地址为栈区,低地址为堆区)
+
+为了验证这个问题,将 `main.m` 文件设置成 `MRC` 环境编译(`target` -> `Build Phases` -> `Compile Sources` -> 对应的文件设置 `compile Flags` 为 `-fno-objc-arc`)
+
+```Objective-c
+int main(int argc, const char * argv[]) {
+    // MRC 环境运行
+    // 设置一个 __block 自动变量
+    __block int auto_num = 1;
+    // 输出初始化时 auto_num 的内存地址
+    NSLog(@"auto_num 初始值 %d, auto_num 的初始内存地址为:%p", auto_num, &auto_num);
+    // 创建一个 myBlock ,此时的 myBlock 应该是在栈上的
+    void (^myBlock)(NSString *string) = ^(NSString *string) {
+        auto_num++;
+        NSLog(@"Block 内 %@ auto_num = %d, auto_num 的内存地址为:%p", string, auto_num, &auto_num);
+    };
+    // auto_num 自增运算
+    auto_num++;
+    // myBlock 没有经过 copy 操作是,调用 myBlock 方法,输出 auto_num 的值和内存地址
+    myBlock(@"myBlock 未经过 copy 操作");
+    
+    NSLog(@"------ Copy 操作 ------");
+    // 将 myBlock 经过 copy 操作,赋值给 copyBlock,此时 myBlock 还是在栈区上,而 copyBlock 是在堆区上
+    void (^copyBlock)(NSString *string) = [myBlock copy];
+    // myBlock 经过 copy 操作是,调用 myBlock 方法,输出 auto_num 的值和内存地址
+    myBlock(@"myBlock 经过 copy 操作");
+    // 调用 copyBlock
+    copyBlock(@"copyBlock");
+    // 打印 myBlock 和 copyBlock 类型
+    NSLog(@"myBlock = %@, copyBlock = %@", myBlock, copyBlock);
+    
+    return 0;
+}
+```
+输出结果
+```Objective-C
+Block[90411:1232567] auto_num 初始值 1, auto_num 的初始内存地址为:0x7ffeefbff5a8
+Block[90411:1232567] Block 内 myBlock 未经过 copy 操作 auto_num = 3, auto_num 的内存地址为:0x7ffeefbff5a8
+Block[90411:1232567] ------ Copy 操作 ------
+Block[90411:1232567] Block 内 myBlock 经过 copy 操作 auto_num = 4, auto_num 的内存地址为:0x100509538
+Block[90411:1232567] Block 内 copyBlock auto_num = 5, auto_num 的内存地址为:0x100509538
+Block[90411:1232567] myBlock = <__NSStackBlock__: 0x7ffeefbff550>, copyBlock = <__NSMallocBlock__: 0x1005094f0>
+Program ended with exit code: 0
+```
+> 经过打印输出发现 `myBlock` 始终在 **栈区** ,经过 `copy` 操作的 `copyBlock` 则是在 **堆区**
+> `myBlock` 未经过 `copy` 操作时 `auto_num` 的内存地址跟初始值的内存地址一致,没有发生改变;经过 `copy` 操作之后,再次调用 `myBlock` 发现 `auto_num` 的地址已经发生了改变而且跟 `copyBlock` 的地址相差 **72**,所以猜测此时的 `auto_num` 已经经过 `copy` 复制到**堆区**上了,这时候
 
 #### 2.2 对象变量
 
