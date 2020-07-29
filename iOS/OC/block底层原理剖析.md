@@ -478,7 +478,7 @@ Block[90411:1232567] myBlock = <__NSStackBlock__: 0x7ffeefbff550>, copyBlock = <
 Program ended with exit code: 0
 ```
 > 经过打印输出发现 `myBlock` 始终在 **栈区** ,经过 `copy` 操作的 `copyBlock` 则是在 **堆区**
-> `myBlock` 未经过 `copy` 操作时 `auto_num` 的内存地址跟初始值的内存地址一致,没有发生改变;经过 `copy` 操作之后,再次调用 `myBlock` 发现 `auto_num` 的地址已经发生了改变而且跟 `copyBlock` 的地址相差 **72**,所以猜测此时的 `auto_num` 已经经过 `copy` 复制到**堆区**上了,这时候
+> `myBlock` 未经过 `copy` 操作时 `auto_num` 的内存地址跟初始值的内存地址一致,没有发生改变;经过 `copy` 操作之后,再次调用 `myBlock` 发现 `auto_num` 的地址已经发生了改变而且跟 `copyBlock` 的地址相差 **72**,所以猜测此时的 `auto_num` 已经经过 `copy` 复制到**堆区**上了.
 
 #### 2.2 对象变量
 
