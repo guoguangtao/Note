@@ -57,25 +57,65 @@ struct __block_impl {
 * __NSMallocBlock__ (存放在 **堆区**)
 
 ```Objective-c
+int global_num = 1;
+static int static_global_num = 2;
 int main(int argc, const char * argv[]) {
-    
-    // __NSStackBlock__
+    // MRC 环境下运行
+    // 访问自动变量
     int num = 3;
+    static int static_num = 4;
+    
     void (^stackBlock)(void) = ^{
         NSLog(@"这是一个__NSStackBlock__, %d", num);
     };
     
-    // __NSGlobalBlock__
+    // 没有访问任何变量
     void (^globalBlock)(void) = ^{
-        NSLog(@"这是一个");
+        NSLog(@"没有访问任何变量");
     };
     
-    // __NSMallocBlock__
-    void (^mallocBlock)(void) = [stackBlock copy];
+    // 访问全局变量
+    void (^globalVarBlock)(void) = ^{
+        global_num++;
+        NSLog(@"访问全局变量");
+    };
     
-    NSLog(@"%@", stackBlock);
-    NSLog(@"%@", globalBlock);
-    NSLog(@"%@", mallocBlock);
+    // 访问静态变量
+    void (^staticVarBlock)(void) = ^{
+        static_num++;
+        NSLog(@"访问静态变量");
+    };
+    
+    // 访问静态全局变量
+    void (^staticGlobalVarBlock)(void) = ^{
+        static_global_num++;
+        NSLog(@"访问静态全局变量");
+    };
+    
+    // 访问自动变量+全局变量
+    void (^autoGlobalVarBlock)(void) = ^{
+        global_num++;
+        NSLog(@"访问自动变量+全局变量 %d", num);
+    };
+    
+    // 将 stackBlock 进行copy操作
+    void (^mallocBlock)(void) = [stackBlock copy];
+
+    // 将 staticGlobalVarBlock 进行copy操作
+    void (^copyGlobalBlock)(void) = [staticGlobalVarBlock copy];
+    
+    // 将 mallocBlock 进行copy操作
+    void (^copyMallocBlock)(void) = [mallocBlock copy];
+    
+    NSLog(@"stackBlock = %@", stackBlock);
+    NSLog(@"globalBlock = %@", globalBlock);
+    NSLog(@"globalVarBlock = %@", globalVarBlock);
+    NSLog(@"staticVarBlock = %@", staticVarBlock);
+    NSLog(@"staticGlobalVarBlock = %@", staticGlobalVarBlock);
+    NSLog(@"autoGlobalVarBlock = %@", autoGlobalVarBlock);
+    NSLog(@"mallocBlock = %@", mallocBlock);
+    NSLog(@"copyGlobalBlock = %@", copyGlobalBlock);
+    NSLog(@"copyMallocBlock = %@", copyMallocBlock);
     
     return 0;
 }
@@ -84,21 +124,21 @@ int main(int argc, const char * argv[]) {
 打印结果
 
 ```Objective-c
-2020-07-30 12:06:09.078961+0800 Block[27713:1860201] <__NSStackBlock__: 0x7ffeefbff578>
-2020-07-30 12:06:09.079962+0800 Block[27713:1860201] <__NSGlobalBlock__: 0x100002058>
-2020-07-30 12:06:09.080709+0800 Block[27713:1860201] <__NSMallocBlock__: 0x100594700>
+2020-07-30 14:31:53.901146+0800 Block[32263:1939884] stackBlock = <__NSStackBlock__: 0x7ffeefbff570>
+2020-07-30 14:31:53.901867+0800 Block[32263:1939884] globalBlock = <__NSGlobalBlock__: 0x100002058>
+2020-07-30 14:31:53.902033+0800 Block[32263:1939884] globalVarBlock = <__NSGlobalBlock__: 0x100002078>
+2020-07-30 14:31:53.902116+0800 Block[32263:1939884] staticVarBlock = <__NSGlobalBlock__: 0x100002098>
+2020-07-30 14:31:53.902178+0800 Block[32263:1939884] staticGlobalVarBlock = <__NSGlobalBlock__: 0x1000020b8>
+2020-07-30 14:31:53.902241+0800 Block[32263:1939884] autoGlobalVarBlock = <__NSStackBlock__: 0x7ffeefbff520>
+2020-07-30 14:31:53.902315+0800 Block[32263:1939884] mallocBlock = <__NSMallocBlock__: 0x100541f50>
+2020-07-30 14:41:08.876729+0800 Block[32573:1946087] copyGlobalBlock = <__NSGlobalBlock__: 0x1000020b8>
+2020-07-30 14:41:08.876800+0800 Block[32573:1946087] copyMallocBlock = <__NSMallocBlock__: 0x100642800>
 Program ended with exit code: 0
 ```
 
-### 2.1 __NSStackBlock__
+### 总结
 
-**什么情况下会是 `__NSStackBlock__` 类型?**
-
-经过上面的代码,可以看出 `stackBlock` 捕获了一个外部自动变量 `num`,而如果没有捕获外部变量,就会是一个 `__NSGlobalBlock__`,就是 `globalBlock`
-
-### 2.2 __NSGlobalBlock__
-
-**什么情况下会是 `__NSGlobalBlock__` 类型?**
+> `Block` 有三种类型(`__NSMallocBlock__` `__NSGlobalBlock__` `__NSStackBlock__`),当 `Block` 内部访问了 `auto` 变量就是 `__NSStackBlock__` 类型;如果没有访问 `auto` 变量就是 `__NSGlobalBlock__` 类型,不管里面是访问了静态变量 、全局变量、静态全局变量;当 `__NSStackBlock__` 发生 `copy` 操作,这时候就是 `__NSMallocBlock__` 类型;当 `__NSGlobalBlock__` 和 `__NSMallocBlock__` 发生 `copy` 操作时, `Block` 的类型不会发生改变.另外如果是对 `__NSGlobalBlock__` 进行 `copy` 操作,还是得到其本身,不会另开辟空间复制一份出来.
 
 
 # Block 捕获外部变量
