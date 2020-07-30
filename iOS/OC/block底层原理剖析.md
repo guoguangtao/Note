@@ -1,5 +1,106 @@
 [toc]
 
+# Block 的类型
+## 1. Block 的本质
+> 其实 `Block` 也是一种 `OC` 对象,继承于 `NSObject`
+
+```Objective-c
+void logBlock(void (^block)(void)) {
+    
+    NSLog(@"%@", block);
+    NSLog(@"%@", [block superclass]);
+    NSLog(@"%@", [[block superclass] superclass]);
+    NSLog(@"%@", [[[block superclass] superclass] superclass]);
+    NSLog(@"%@", [[[[block superclass] superclass] superclass] superclass]);
+}
+
+int main(int argc, const char * argv[]) {
+    
+    void (^myBlock)(void) = ^{
+        NSLog(@"这是一个Block");
+    };
+    
+    logBlock(myBlock);
+    
+    return 0;
+}
+```
+打印结果:
+
+```Objective-c
+2020-07-30 11:49:06.718667+0800 Block[27169:1848581] <__NSGlobalBlock__: 0x100002030>
+2020-07-30 11:49:06.719339+0800 Block[27169:1848581] __NSGlobalBlock
+2020-07-30 11:49:06.719428+0800 Block[27169:1848581] NSBlock
+2020-07-30 11:49:06.719529+0800 Block[27169:1848581] NSObject
+2020-07-30 11:49:06.719580+0800 Block[27169:1848581] (null)
+Program ended with exit code: 0
+```
+
+从结果可以看出, `Block` 其实是一个 `OC` 对象,同时查看 `Block` 结构,发现 `Block` 内部有一个 `isa` 指针.
+
+```C++
+/// Block 的基本结构
+struct __block_impl {
+    void *isa;
+    int Flags;
+    int Reserved;
+    void *FuncPtr;
+};
+```
+
+## 2. Block 的 3 种类型
+
+`Block` 有 三种类型
+
+* __NSStackBlock__ (存放在 **栈区**)
+* __NSGlobalBlock__ (存放在 **全局区(数据区域)**)
+* __NSMallocBlock__ (存放在 **堆区**)
+
+```Objective-c
+int main(int argc, const char * argv[]) {
+    
+    // __NSStackBlock__
+    int num = 3;
+    void (^stackBlock)(void) = ^{
+        NSLog(@"这是一个__NSStackBlock__, %d", num);
+    };
+    
+    // __NSGlobalBlock__
+    void (^globalBlock)(void) = ^{
+        NSLog(@"这是一个");
+    };
+    
+    // __NSMallocBlock__
+    void (^mallocBlock)(void) = [stackBlock copy];
+    
+    NSLog(@"%@", stackBlock);
+    NSLog(@"%@", globalBlock);
+    NSLog(@"%@", mallocBlock);
+    
+    return 0;
+}
+```
+
+打印结果
+
+```Objective-c
+2020-07-30 12:06:09.078961+0800 Block[27713:1860201] <__NSStackBlock__: 0x7ffeefbff578>
+2020-07-30 12:06:09.079962+0800 Block[27713:1860201] <__NSGlobalBlock__: 0x100002058>
+2020-07-30 12:06:09.080709+0800 Block[27713:1860201] <__NSMallocBlock__: 0x100594700>
+Program ended with exit code: 0
+```
+
+### 2.1 __NSStackBlock__
+
+**什么情况下会是 `__NSStackBlock__` 类型?**
+
+经过上面的代码,可以看出 `stackBlock` 捕获了一个外部自动变量 `num`,而如果没有捕获外部变量,就会是一个 `__NSGlobalBlock__`,就是 `globalBlock`
+
+### 2.2 __NSGlobalBlock__
+
+**什么情况下会是 `__NSGlobalBlock__` 类型?**
+
+
 # Block 捕获外部变量
 
 ## 4种变量类型
