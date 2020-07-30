@@ -831,6 +831,13 @@ int main(int argc, const char * argv[]) {
 4. 如果需要修改自动变量,则需要加上 `__block` 修饰,不管捕获的是普通非对象变量还是对象变量,最后都会在底层创建一个类似 `__Block_byref_变量名_0` 的结构体用来捕获外部需要捕获的自动变量.
 
 
+# Block 的循环引用
+
+## 什么是循环引用
+
+> 当A对象里面强引用了B对象，B对象又强引用了A对象，这样两者的retainCount值一直都无法为0，于是内存始终无法释放，导致内存泄露。所谓的内存泄露就是本应该释放的对象，在其生命周期结束之后依旧存在。
+
+![循环引用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200730164714.png)
 
 
 
