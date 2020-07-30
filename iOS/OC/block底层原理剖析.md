@@ -556,6 +556,18 @@ int main(int argc, const char * argv[]) {
 
 ![经过copy操作得到的copyBlock结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200729225154.png)
 
+经过断点调试,查看 `noCopyMyBlock` `myBlockImpl` `copyBlockImpl` 这三个结构体变化:
+
+1. 在 `myBlock` 还未经过 `copy` 操作的时候,转化成 `__main_block_impl_0` 的结构体 `noCopyMyBlock`,会发现此时的 `noCopyMyBlock` 中的 `auto_num` 指针变量中的 `__forwarding` 指针变量指向的是自己本身的地址空间
+2. 经过 `copy` 之后, `myBlock` 转化成 `myBlockImpl` ,发现 `auto_num` 指针变量的地址没有发生改变,但是其 `__forwarding` 已经指向了 **堆区** 上的一块空间了.
+3. `myBlock` 经过 `copy` 操作,重新得到了一个 `copyBlockImpl`,其 `auto_num` 变量的地址值就是 `myBlockImpl` 中 `__forwarding` 所指向的那块内存空间.
+
+通过以上代码,证实了刚才的猜想,**栈区**上的 `myBlock` 经过 `copy` 操作后,复制到了 **堆区** 上,这时候 **堆区** 上的 `copyBlock` 重新分配了内存空间,并且**栈区**上的 `myBlock` 中的 `__forwarding` 指针变量指向了`copyBlock`中的 `auto_num` 这块内存空间.
+
+接下来,说说 **为什么要使用 __forwarding 这个去取值,而不是直接使用 auto_num 去取值呢**,我的看法是:
+
+> 一开始 `myBlock` 是分配在 **栈** 上的,经过 **copy** 操作后,在 **堆** 上重新分配了一块内存空间得到一个新的 `copyBlock`, 深拷贝行为,这样就算 `myBlock` 释放了, 也不会影响到 `copyBlock`,**栈** 因为作用域的问题,出了作用域就会被释放,而 **堆** 则需程序员自己管理(ARC不用程序员手动管理内存,是因为编译器会自动插入对应的内存管理代码),如果 `myBlock` 和 `copyBlock` 都是指向自己本身,那么修改 `auto_num` 变量值,只会修改其中一个,而不会同时修改另外一个,因为这两个 `block` 已经不再是同一个对象了,所以就很好理解 **为什么 `myBlock` 和 `copyBlock` 为什么 __forwarding 要同时指向一块内存空间**,同时也能理解为什么要使用 **`__forwarding` 这样一个指针变量去取值了**
+
 #### 2.2 对象变量
 
 
