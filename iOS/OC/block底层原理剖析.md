@@ -570,13 +570,124 @@ int main(int argc, const char * argv[]) {
 
 #### 2.2 对象变量
 
+```objective-c
+int main(int argc, const char * argv[]) {
+    __strong NSString *string = @"123";
+    // 在这里使用拼接的方式,是因为 __block 修饰的直接赋值 @"123" 这种常量字符串, clang 编译会报错
+    __block NSMutableString *mutableString = [NSMutableString string];
+    for (int i = 0; i < 10; i++) {
+        [mutableString appendFormat:@"%@", [NSString stringWithFormat:@"%ld", (long)arc4random_uniform(100)]];
+    }
+    
+    NSLog(@"mutableString = <%p, %@>, string = <%p, %@>", &mutableString, mutableString, &string, string);
+    
+    void (^myBlock)(NSString *str) = ^(NSString *str) {
+        NSLog(@"%@ mutableString = <%p, %@>, string = <%p, %@>", str, &mutableString, mutableString, &string, string);
+    };
+    
+    myBlock(@"未经过 Copy 操作");
+    
+    void (^copyMyBlock)(NSString *str) = [myBlock copy];
+    
+    copyMyBlock(@"经过 copy 操作");
+    
+    NSLog(@"myBlock = %@, copyMyBlock = %@", myBlock, copyMyBlock);
+    
+    return 0;
+}
+```
 
+输出结果:
+
+```Objective-c
+2020-07-30 11:09:49.182219+0800 Block[24593:1820255] mutableString = <0x7ffeefbff5a0, 7858784622994702064>, string = <0x7ffeefbff5a8, 123>
+2020-07-30 11:09:49.183141+0800 Block[24593:1820255] 未经过 Copy 操作 mutableString = <0x7ffeefbff5a0, 7858784622994702064>, string = <0x7ffeefbff548, 123>
+2020-07-30 11:09:49.183371+0800 Block[24593:1820255] 经过 copy 操作 mutableString = <0x1007173e8, 7858784622994702064>, string = <0x1007173b0, 123>
+2020-07-30 11:09:49.183797+0800 Block[24593:1820255] myBlock = <__NSStackBlock__: 0x7ffeefbff528>, copyMyBlock = <__NSMallocBlock__: 0x100717390>
+Program ended with exit code: 0
+```
+
+`clang` 转化后
+
+```C++
+struct __Block_byref_mutableString_0 {
+    void *__isa;
+    __Block_byref_mutableString_0 *__forwarding;
+    int __flags;
+    int __size;
+    void (*__Block_byref_id_object_copy)(void*, void*);
+    void (*__Block_byref_id_object_dispose)(void*);
+    NSMutableString *mutableString;
+};
+
+struct __main_block_impl_0 {
+    struct __block_impl impl;
+    struct __main_block_desc_0* Desc;
+    NSString *string;
+    __Block_byref_mutableString_0 *mutableString; // by ref
+    __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, NSString *_string, __Block_byref_mutableString_0 *_mutableString, int flags=0) : string(_string), mutableString(_mutableString->__forwarding) {
+        impl.isa = &_NSConcreteStackBlock;
+        impl.Flags = flags;
+        impl.FuncPtr = fp;
+        Desc = desc;
+    }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself, NSString *str) {
+    __Block_byref_mutableString_0 *mutableString = __cself->mutableString; // bound by ref
+    NSString *string = __cself->string; // bound by copy
+    
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_4, str, &(mutableString->__forwarding->mutableString), (mutableString->__forwarding->mutableString), &string, string);
+}
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {
+    _Block_object_assign((void*)&dst->mutableString, (void*)src->mutableString, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_assign((void*)&dst->string, (void*)src->string, 3/*BLOCK_FIELD_IS_OBJECT*/);
+}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {
+    _Block_object_dispose((void*)src->mutableString, 8/*BLOCK_FIELD_IS_BYREF*/);
+    _Block_object_dispose((void*)src->string, 3/*BLOCK_FIELD_IS_OBJECT*/);
+}
+
+static struct __main_block_desc_0 {
+    size_t reserved;
+    size_t Block_size;
+    void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+    void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+
+int main(int argc, const char * argv[]) {
+    __attribute__((objc_ownership(strong))) NSString *string = (NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_0;
+    
+    __attribute__((__blocks__(byref))) __Block_byref_mutableString_0 mutableString = {(void*)0,(__Block_byref_mutableString_0 *)&mutableString, 33554432, sizeof(__Block_byref_mutableString_0), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSMutableString * _Nonnull (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSMutableString"), sel_registerName("string"))};
+    for (int i = 0; i < 10; i++) {
+        ((void (*)(id, SEL, NSString * _Nonnull, ...))(void *)objc_msgSend)((id)(mutableString.__forwarding->mutableString), sel_registerName("appendFormat:"), (NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_1, ((NSString * _Nonnull (*)(id, SEL, NSString * _Nonnull, ...))(void *)objc_msgSend)((id)objc_getClass("NSString"), sel_registerName("stringWithFormat:"), (NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_2, (long)arc4random_uniform(100)));
+    }
+    
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_3, &(mutableString.__forwarding->mutableString), (mutableString.__forwarding->mutableString), &string, string);
+    
+    void (*myBlock)(NSString *str) = ((void (*)(NSString *))&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, string, (__Block_byref_mutableString_0 *)&mutableString, 570425344));
+    
+    ((void (*)(__block_impl *, NSString *))((__block_impl *)myBlock)->FuncPtr)((__block_impl *)myBlock, (NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_5);
+    
+    void (*copyMyBlock)(NSString *str) = (void (*)(NSString *))((id (*)(id, SEL))(void *)objc_msgSend)((id)myBlock, sel_registerName("copy"));
+    
+    ((void (*)(__block_impl *, NSString *))((__block_impl *)copyMyBlock)->FuncPtr)((__block_impl *)copyMyBlock, (NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_6);
+    
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_6l_fbpz14xx3y9cm2rh9591kd740000gn_T_main_dbdabb_mi_7, myBlock, copyMyBlock);
+    
+    return 0;
+}
+```
+
+对象变量,经过 `clang` 之后发现,跟非对象变量相差不是很大,只是将普通非对象变量换成了对象变量(指针变量)而已.
 
 ## 总结
 
-全局变量、静态全局变量因为作用域的原因，都是放在全局区中，所以在 block 内部可以直接修改；
-静态变量是通过地址捕获进去的，通过修改该空间的值也能直接修改；
-自动变量是通过 **值传递** 进行捕获，传入进去就是一个数值，所以无法修改
+1. 全局变量、静态全局变量因为作用域的原因，都是放在全局区中，所以在 block 内部可以直接修改,不会捕获进去；
+2. 静态变量是通过地址捕获进去的，通过修改该空间的值也能直接修改；
+3. 自动变量是通过 **值传递** 进行捕获，传入进去就是一个数值，所以无法修改;
+4. 如果需要修改自动变量,则需要加上 `__block` 修饰,不管捕获的是普通非对象变量还是对象变量,最后都会在底层创建一个类似 `__Block_byref_变量名_0` 的结构体用来捕获外部需要捕获的自动变量.
 
 
 
