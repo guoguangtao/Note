@@ -138,7 +138,7 @@ Program ended with exit code: 0
 
 ### 总结
 
-> `Block` 有三种类型(`__NSMallocBlock__` `__NSGlobalBlock__` `__NSStackBlock__`),当 `Block` 内部访问了 `auto` 变量就是 `__NSStackBlock__` 类型;如果没有访问 `auto` 变量就是 `__NSGlobalBlock__` 类型,不管里面是访问了静态变量 、全局变量、静态全局变量;当 `__NSStackBlock__` 发生 `copy` 操作,这时候就是 `__NSMallocBlock__` 类型;当 `__NSGlobalBlock__` 和 `__NSMallocBlock__` 发生 `copy` 操作时, `Block` 的类型不会发生改变.另外如果是对 `__NSGlobalBlock__` 进行 `copy` 操作,还是得到其本身,不会另开辟空间复制一份出来.
+> `Block` 有三种类型(`__NSMallocBlock__` `__NSGlobalBlock__` `__NSStackBlock__`),当 `Block` 内部访问了 `auto` 变量、成员变量或者属性就是 `__NSStackBlock__` 类型;如果没有访问 `auto` 、成员变量、属性就是 `__NSGlobalBlock__` 类型,不管里面是访问了静态变量 、全局变量、静态全局变量;当 `__NSStackBlock__` 发生 `copy` 操作,这时候就是 `__NSMallocBlock__` 类型;当 `__NSGlobalBlock__` 和 `__NSMallocBlock__` 发生 `copy` 操作时, `Block` 的类型不会发生改变.另外如果是对 `__NSGlobalBlock__` 进行 `copy` 操作,还是得到其本身,不会另开辟空间复制一份出来.
 
 
 # Block 捕获外部变量
