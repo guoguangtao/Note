@@ -839,7 +839,11 @@ int main(int argc, const char * argv[]) {
 
 ![循环引用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200730164714.png)
 
+以上是2个对象之间的，这种循环存在于3、4个对象之间，只要相互形成环，就会导致循环引用的问题。
 
+当然也存在自身引用自身的，当一个对象A内部的一个对象B，强引用自身，也会导致循环引用问题，常见的就是 `Block` 的循环引用问题。
 
+![block 循环引用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200801183607.png)
 
-
+## 避免循环引用
+要想避免出现循环引用,就必须要打破这个环,**使用 `__weak` 关键字打破这个循环**
