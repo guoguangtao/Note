@@ -955,3 +955,5 @@ int main(int argc, const char * argv[]) {
         }
     };
     ```
+
+    这时候 `person` 多了一个 `__weak` 关键字修饰,编译器根据这个在 block 内部不会强引用 person 对象,产生弱引用,这样就避免了一个环的出现,从而就不再导致内存泄漏了.
