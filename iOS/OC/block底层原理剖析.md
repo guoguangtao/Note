@@ -846,4 +846,112 @@ int main(int argc, const char * argv[]) {
 ![block 循环引用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200801183607.png)
 
 ## 避免循环引用
-要想避免出现循环引用,就必须要打破这个环,**使用 `__weak` 关键字打破这个循环**
+要想避免出现循环引用,就必须要打破这个环,**使用 `__weak` 关键字打破这个循环**.
+
+### 循环引用
+1. 新建一个 `YXCPerson` 类,在 .h 文件中添加以下代码:
+
+    ```Objective-C
+    typedef void(^LogBlock)(void);
+
+    @interface YXCPerson : NSObject
+
+    @property (nonatomic, copy) NSString *name; /**< 姓名 */
+    @property (nonatomic, copy) LogBlock logBlock; /**< block */
+
+    @end
+    ```
+    在这里,给 `YXCPerson` 这个类设置了两个属性,一个是 `name`,另外一个是一个 `block`.
+
+2. `main` 方法中添加以下代码:
+    ```Objective-C
+    int main(int argc, const char * argv[]) {
+        
+        {
+            // ARC 环境
+            YXCPerson *person = [YXCPerson new];
+            person.logBlock = ^{
+                NSLog(@"%@", person.name);
+            };
+            
+            NSLog(@"person : <%p, %@>", &person, person);
+            NSLog(@"person.logBlock = %@", person.logBlock);
+        }
+        
+        return 0;
+    }
+    ```
+
+    在写入这段代码的时候,编译器就会提示一个警告,告诉我们此处可能存在内存泄漏.
+    ```
+    Capturing 'person' strongly in this block is likely to lead to a retain cycle.
+    ```
+
+    运行结果,发现 `person` 确实没有被释放(`YXCPerson.m` 文件重写 `dealloc` 方法)
+
+    ![Block 产生了循环引用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200804202818.png)
+
+3. 老规矩,进行 `clang` 转换之后,`Block` 中的主要代码如下
+
+    ```C++
+    struct __main_block_impl_0 {
+        struct __block_impl impl;
+        struct __main_block_desc_0* Desc;
+        YXCPerson *person;
+        __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, YXCPerson *_person, int flags=0) : person(_person) {
+            impl.isa = &_NSConcreteStackBlock;
+            impl.Flags = flags;
+            impl.FuncPtr = fp;
+            Desc = desc;
+        }
+    };
+    ```
+    这个结构体有一个 `person` 属性,在这里需要说明的一点就是,因为系统默认就是 `__strong` 类型,所以在这里默认也是 `YXCPerson *__strong person`,在这时候, `block` 内部会调用 `copy` 方法,对 `person` 进行强引用,导致引用计数器 +1 操作,而 `block` 又是 `person` 的一个属性(还是强引用属性),这就导致了 `person` 引用了 `block`, 而 `block` 内部也引用了 `person`,这时候形成了一个环,导致了内存泄漏.
+
+### 使用 __weak 断环
+
+1. `main` 函数中实现以下代码:
+    ```Objective-C
+    int main(int argc, const char * argv[]) {
+    
+        {
+            // ARC 环境
+            YXCPerson *person = [YXCPerson new];
+            __weak typeof(person) weakPerson = person;
+            person.logBlock = ^{
+                NSLog(@"%@", weakPerson.name);
+            };
+            
+            NSLog(@"person : <%p, %@>", &person, person);
+            NSLog(@"person.logBlock = %@", person.logBlock);
+        }
+        
+        return 0;
+    }
+    ```
+    
+    ![使用 __weak 断环](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200804204523.png)
+
+2. `clang` 此时增加了一个 `__weak`,如果再使用之前的命令会报错
+
+    ![clang 命令报错](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200804204803.png)
+
+    这时候需要使用增加一些参数,进行 `clang`
+    ```C++
+    xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc -fobjc-arc -fobjc-runtime=ios-8.0.0 main.m
+    ```
+    转换后的代码 `block` 主要代码:
+
+    ```C++
+    struct __main_block_impl_0 {
+        struct __block_impl impl;
+        struct __main_block_desc_0* Desc;
+        YXCPerson *__weak weakPerson;
+        __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, YXCPerson *__weak _weakPerson, int flags=0) : weakPerson(_weakPerson) {
+            impl.isa = &_NSConcreteStackBlock;
+            impl.Flags = flags;
+            impl.FuncPtr = fp;
+            Desc = desc;
+        }
+    };
+    ```
