@@ -132,3 +132,5 @@ flutter create --template module {moduleName}
 
 这样就在 `iOS` 工程调用了 `Flutter` 界面.
 
+![OC调用Flutter界面](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/OC%E8%B0%83%E7%94%A8Flutter%E7%95%8C%E9%9D%A2.gif)
+
