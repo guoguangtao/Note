@@ -53,5 +53,82 @@ flutter create --template module {moduleName}
 
 为了在既有的`iOS`应用中展示`Flutter`页面，需要启动 `Flutter Engine` 和 `FlutterViewController`,通常建议为我们的应用预热一个长时间存活的 `FlutterEngine`,我们将在应用启动的 `appdelegate` 中创建一个 `FlutterEngine`，并作为属性暴露给外界.
 
+**AppDelegate.h**
 
+```Objective-C
+@import UIKit;
+@import Flutter;
+
+@interface AppDelegate : FlutterAppDelegate
+
+@property (nonatomic, strong) FlutterEngine *flutterEngine;
+
+@end
+```
+
+**AppDelegate.m**
+
+```Objective-C
+#import "AppDelegate.h"
+#import <FlutterPluginRegistrant/GeneratedPluginRegistrant.h>
+
+@interface AppDelegate ()
+
+@end
+
+@implementation AppDelegate
+
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary<UIApplicationLaunchOptionsKey,id> *)launchOptions {
+    
+    self.flutterEngine = [[FlutterEngine alloc] initWithName:@"my flutter engine"];
+    [self.flutterEngine run];
+    [GeneratedPluginRegistrant registerWithRegistry:self.flutterEngine];
+    
+    return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+@end
+```
+
+下面的示例显示一个通用的 `ViewController`，其中有一个 `UIButton` 用于显示 `FlutterViewController`。`FlutterViewController` 使用在 `AppDelegate` 中创建的 `FlutterEngine` 实例。
+
+**ViewController.m**
+
+```Objective-C
+#import "ViewController.h"
+#import "AppDelegate.h"
+@import Flutter;
+
+@interface ViewController ()
+
+@end
+
+@implementation ViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    UIButton *button = [UIButton new];
+    button.backgroundColor = UIColor.blueColor;
+    button.frame = CGRectMake(80, 210, 160, 40);
+    [button addTarget:self
+               action:@selector(buttonClicked)
+     forControlEvents:UIControlEventTouchUpInside];
+    [button setTitle:@"OC 调用 Flutter" forState:UIControlStateNormal];
+    [self.view addSubview:button];
+}
+
+- (void)buttonClicked {
+    
+    FlutterEngine *flutterEngine = ((AppDelegate *)UIApplication.sharedApplication.delegate).flutterEngine;
+    FlutterViewController *flutterViewController = [[FlutterViewController alloc] initWithEngine:flutterEngine
+                                                                                         nibName:nil
+                                                                                          bundle:nil];
+    [self presentViewController:flutterViewController
+                       animated:YES
+                     completion:nil];
+}
+```
+
+这样就在 `iOS` 工程调用了 `Flutter` 界面.
 
