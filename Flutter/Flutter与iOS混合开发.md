@@ -248,14 +248,16 @@ class __HomePageState extends State<_HomePage> {
    ```
 
    2.3 启动 `App`
-   
+
    ![启动 App 之后,终端显示](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200814162103.png)
 
    2.4 这样就可以在终端使用热加载了
 
-   > r : 热加载；
-   > R : 热重启；
-   > h : 获取帮助；
-   > d : 断开连接；
-   > q : 退出
+    ```
+    r : 热加载；
+    R : 热重启；
+    h : 获取帮助；
+    d : 断开连接；
+    q : 退出
+    ```
 
