@@ -236,13 +236,19 @@ class __HomePageState extends State<_HomePage> {
 
 1. 关闭 `App`
 2. 在 `terminal` 中运行 `flutter attach` 命令。(**这里需要进入到 Flutter module 工程路径,不然会报找不到 lib/main.dart 错误**)
+
     2.1 如果当前有多台设备,会出现如下提示
+
    ![多台设备提示](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200814161736.png)
-   2.2 使用一下命令
+
+   2.2 使用以下命令
+
    ```
    flutter attach -d {设备标识}
    ```
+
    2.3 启动 `App`
+   
    ![启动 App 之后,终端显示](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200814162103.png)
 
    2.4 这样就可以在终端使用热加载了
