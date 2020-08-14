@@ -49,7 +49,7 @@ flutter create --template module {moduleName}
 2. 执行 `pod install`
 ![执行 pod install 结果](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200807163711.png)
 
-### 5. `OC` 调用 `Flutter` 界面
+### 5. iOS 与 Flutter 的通信(界面跳转)
 
 为了在既有的`iOS`应用中展示`Flutter`页面，需要启动 `Flutter Engine` 和 `FlutterViewController`,通常建议为我们的应用预热一个长时间存活的 `FlutterEngine`,我们将在应用启动的 `appdelegate` 中创建一个 `FlutterEngine`，并作为属性暴露给外界.
 
@@ -101,6 +101,9 @@ flutter create --template module {moduleName}
 
 @interface ViewController ()
 
+@property (nonatomic, strong) FlutterMethodChannel *messageChannel;
+@property (nonatomic, strong) UILabel *resultLabel;
+
 @end
 
 @implementation ViewController
@@ -116,21 +119,115 @@ flutter create --template module {moduleName}
      forControlEvents:UIControlEventTouchUpInside];
     [button setTitle:@"OC 调用 Flutter" forState:UIControlStateNormal];
     [self.view addSubview:button];
+
+    self.resultLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, 250, self.view.bounds.size.width, 50)];
+    self.resultLabel.font = [UIFont systemFontOfSize:14.0f];
+    self.resultLabel.textAlignment = NSTextAlignmentCenter;
+    [self.view addSubview:self.resultLabel];
 }
 
 - (void)buttonClicked {
     
+    // 获取全局的 flutterEngine,防止跳转的时候卡顿
     FlutterEngine *flutterEngine = ((AppDelegate *)UIApplication.sharedApplication.delegate).flutterEngine;
-    FlutterViewController *flutterViewController = [[FlutterViewController alloc] initWithEngine:flutterEngine
-                                                                                         nibName:nil
-                                                                                          bundle:nil];
-    [self presentViewController:flutterViewController
-                       animated:YES
-                     completion:nil];
+    // 跳转的界面控制器
+    FlutterViewController *flutterController = [[FlutterViewController alloc] initWithEngine:flutterEngine nibName:nil bundle:nil];
+    // 设置标记,需要跟 dart 中的 main.dart 一致
+    NSString *channelName = @"com.pages.your/native_get";
+    // 创建 FlutterMethodChannel
+    _messageChannel = [FlutterMethodChannel methodChannelWithName:channelName binaryMessenger:flutterController.binaryMessenger];
+    // 设置当前 FlutterMethodChannel 的方法名和需要传递过去的参数
+    [_messageChannel invokeMethod:@"NativeToFlutter" arguments:@[@"原生调用Flutter参数1", @"原生调用Flutter参数2"]];
+    // 跳转界面
+    [self.navigationController pushViewController:flutterController animated:YES];
+    // Flutter 回调
+    __weak typeof(self) weakSelf = self;
+    [_messageChannel setMethodCallHandler:^(FlutterMethodCall * _Nonnull call, FlutterResult  _Nonnull result) {
+        [flutterController.navigationController popViewControllerAnimated:YES];
+        NSArray *array = (NSArray *)call.arguments;
+        NSMutableString *mutableString = [NSMutableString string];
+        for (NSString *string in array) {
+            [mutableString appendFormat:@"%@ ", string];
+        }
+        weakSelf.resultLabel.text = mutableString;
+    }];
 }
 ```
 
-这样就在 `iOS` 工程调用了 `Flutter` 界面.
+**Dart**
 
-![OC调用Flutter界面](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/OC%E8%B0%83%E7%94%A8Flutter%E7%95%8C%E9%9D%A2.gif)
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        home: _HomePage()
+    );
+  }
+}
+
+class _HomePage extends StatefulWidget {
+  @override
+  __HomePageState createState() => __HomePageState();
+}
+
+class __HomePageState extends State<_HomePage> {
+
+  String title = "Flutter to Native";
+  Color backgroundColor = Colors.red;
+  // 创建 MethodChannel 这里的标志跟 ios 中设置要一致
+  static const MethodChannel methodChannel = const MethodChannel('com.pages.your/native_get');
+  // Flutter 调用原生
+  _iOSPushToVC() {
+    methodChannel.invokeMethod('FlutterToNative', ["Flutter 调用原生参数 1", "Flutter 调用原生参数 2"]);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // 设置原生调用 Flutter 回调,获取到方法名和参数
+    methodChannel.setMethodCallHandler((MethodCall call){
+      if (call.method == "NativeToFlutter") {
+        setState(() {
+          List<dynamic> arguments = call.arguments;
+          String str = "";
+          for (dynamic string in arguments) {
+            str = str + " " + string;
+          }
+          title = str;
+          backgroundColor = Colors.orange;
+        });
+      }
+      return Future<dynamic>.value();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      body: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          child: Text(title),
+          onTap: (){
+            _iOSPushToVC();
+          },
+        ),
+      ),
+    );
+  }
+}
+```
+
+运行结果为:
+
+![iOS与Flutter通信](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/iOS%E4%B8%8EFlutter%E9%80%9A%E4%BF%A1.gif)
+
+
+这样一个原生与 `Flutter` 的通信就完成了,原生调用 `Flutter` 界面并且传递参数过去,`Flutter` 回到原生带回参数.
