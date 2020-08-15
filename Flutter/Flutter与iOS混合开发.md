@@ -1,8 +1,8 @@
 [toc]
 
 ### 1.系统要求
-* 安装了 `Flutter`
-* 安装了 `Xcode`
+* 安装了 `Flutter`(`Flutter` 版本 `1.2` 及更高版本)
+* 安装了 `Xcode`(支持 `iOS8` 及更高版本,安卓 `Java8`,  Android Studio 3.6才支持Android Studio的应用程序添加流程)
 
 ### 2.创建 `Flutter module`
 
