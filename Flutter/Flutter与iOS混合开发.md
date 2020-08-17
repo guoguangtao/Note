@@ -261,3 +261,235 @@ class __HomePageState extends State<_HomePage> {
     q : 退出
     ```
 
+
+### 7. 使用 `Flutter_Boost` 进行交互
+
+[Flutter_Boost](https://github.com/alibaba/flutter_boost) 是阿里巴巴-闲鱼技术提供的`Flutter-Native`混合解决方案.`FlutterBoost`是一个`Flutter`插件，它可以轻松地为现有原生应用程序提供`Flutter`混合集成方案。`FlutterBoost`的理念是将`Flutter`像`Webview`那样来使用。在现有应用程序中同时管理`Native`页面和`Flutter`页面并非易事。 `FlutterBoost`帮你处理页面的映射和跳转，你只需关心页面的名字和参数即可（通常可以是`URL`）。
+
+#### 7.1 前置条件
+
+在继续之前，您需要将Flutter集成到你现有的项目中。flutter sdk 的版本需要和boost版本适配，否则会编译失败.
+
+![boost 版本说明](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200817111356.png)
+
+#### 7.2 安装
+##### 7.2.1 添加到 `pubspec.yaml` 文件中
+
+```Dart
+dependencies:
+  flutter_boost: ^1.12.13+3
+```
+
+##### 7.2.2 初始化
+
+```Dart
+flutter pub get
+```
+
+##### 7.2.3 `Dart` 代码
+
+```Dart
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_boost/flutter_boost.dart';
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // 注册路由
+    FlutterBoost.singleton.registerPageBuilders(<String, PageBuilder>{
+      'first':
+          (String pageName, Map<String, dynamic> params, String uniqueId) =>
+              FirstRouteWidget(),
+    });
+  }
+
+  void _onRoutePushed(
+    String pageName,
+    String uniqueId,
+    Map<String, dynamic> params,
+    Route<dynamic> route,
+    Future<dynamic> _,
+  ) {}
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+        title: 'Flutter Boost example',
+        // 初始化
+        builder: FlutterBoost.init(postPush: _onRoutePushed),
+        home: Container(color: Colors.white));
+  }
+}
+
+/// 需要跳转的界面
+class FirstRouteWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(title: 'First', home: Container(color: Colors.orange));
+  }
+}
+```
+
+##### 7.2.4 `native`代码
+1. 新建 `PlatformRouterImp` 文件,作为路由管理.继承于 `NSObject`,并且遵守 `FLBPlatform` 协议
+
+    **PlatformRouterImp.h**
+
+    ```Objective-C
+    #import <Foundation/Foundation.h>
+    #import <UIKit/UIKit.h>
+    #import <FlutterBoost.h>
+
+    @interface PlatformRouterImp : NSObject<FLBPlatform>
+
+    #pragma mark - Property
+
+    @property (nonatomic, weak) UINavigationController *navigationController;
+
+
+    #pragma mark - Method
+
+    + (instancetype)shareRouter;
+
+    @end
+    ```
+
+    **PlatformRouterImp.m**
+
+    ```Objective-C
+    #import "PlatformRouterImp.h"
+
+    static PlatformRouterImp *_router;
+
+    @interface PlatformRouterImp ()
+
+
+
+    @end
+
+    @implementation PlatformRouterImp
+
+    #pragma mark - Lifecycle
+
+    + (instancetype)shareRouter {
+        
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            _router = [[PlatformRouterImp alloc] init];
+        });
+        
+        return _router;
+    }
+
+    - (void)dealloc {
+        
+        NSLog(@"%s", __func__);
+    }
+
+
+    #pragma mark - Custom Accessors (Setter 方法)
+
+
+    #pragma mark - Public
+
+
+    #pragma mark - Private
+
+
+    #pragma mark - Protocol
+
+    /**
+    * 基于Native平台实现页面打开，Dart层的页面打开能力依赖于这个函数实现；Native或者Dart侧不建议直接使用这个函数。应直接使用FlutterBoost封装的函数
+    *
+    * @param url 打开的页面资源定位符
+    * @param urlParams 传人页面的参数; 若有特殊逻辑，可以通过这个参数设置回调的id
+    * @param exts 额外参数
+    * @param completion 打开页面的即时回调，页面一旦打开即回调
+    */
+    - (void)open:(NSString *)url
+      urlParams:(NSDictionary *)urlParams
+            exts:(NSDictionary *)exts
+      completion:(void (^)(BOOL finished))completion {
+        
+        FLBFlutterViewContainer *controller = [FLBFlutterViewContainer new];
+        // 这句代码千万不能省略
+        [controller setName:url params:urlParams];
+        if (self.navigationController) {
+            [self.navigationController pushViewController:controller animated:YES];
+        }
+        if (completion) {
+            completion(YES);
+        }
+    }
+
+
+    #pragma mark - 懒加载
+
+
+
+    @end
+    ```
+2. **AppDelegate.m**
+
+    ```Objective-C
+    - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+        
+        PlatformRouterImp *router = [PlatformRouterImp shareRouter];
+        [FlutterBoostPlugin.sharedInstance startFlutterWithPlatform:router onStart:^(FlutterEngine * _Nonnull engine) {
+            
+        }];
+        
+        return YES;
+    }
+    ```
+
+3. **ViewController.m**
+    ```Objective-C
+    #import "ViewController.h"
+    #import <FlutterBoost.h>
+    #import "PlatformRouterImp.h"
+
+    @interface ViewController ()
+
+    @end
+
+    @implementation ViewController
+
+    - (void)viewDidLoad {
+        [super viewDidLoad];
+        
+        UIButton *button = [[UIButton alloc] initWithFrame:CGRectMake(100, 230, 250, 30)];
+        button.backgroundColor = UIColor.orangeColor;
+        [button setTitle:@"跳转 FLutter" forState:UIControlStateNormal];
+        [button addTarget:self action:@selector(buttonClicked) forControlEvents:UIControlEventTouchUpInside];
+        [self.view addSubview:button];
+    }
+
+    - (void)buttonClicked {
+        
+        NSLog(@"跳转 Flutter");
+        PlatformRouterImp.shareRouter.navigationController = self.navigationController;
+        [FlutterBoostPlugin open:@"first" urlParams:@{kPageCallBackId:@"MycallbackId#1"} exts:@{@"animated":@(YES)} onPageFinished:^(NSDictionary *result) {
+            NSLog(@"call me when page finished, and your result is:%@", result);
+        } completion:^(BOOL f) {
+            NSLog(@"page is opened");
+        }];
+    }
+    ```
+
+    这样就是用了 `Flutter_Boost` 进行原生与 `Flutter` 的跳转.
+
+  ![Flutter_Boost_Native_Flutter](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/Flutter_Boost_Native_Flutter.gif)
+
+  **[controller setName:url params:urlParams]不能省略,省略了会报错**
+
+  ![省略了报错](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200817113909.png)
