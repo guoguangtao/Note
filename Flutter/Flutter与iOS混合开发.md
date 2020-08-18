@@ -493,3 +493,11 @@ class FirstRouteWidget extends StatelessWidget {
   **[controller setName:url params:urlParams]不能省略,省略了会报错**
 
   ![省略了报错](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200817113909.png)
+
+### 8.断点调试
+
+1. 先将 `App` 进行杀掉
+2. 在 `Android Studio` 中进行操作
+  ![断点调试操作](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200818174020.png)
+3. 打开 `Xcode` 进行 `run` 工程
+4. 这样就可以进行断点调试了.
