@@ -503,3 +503,4 @@ class FirstRouteWidget extends StatelessWidget {
 4. 这样就可以进行断点调试了.
 
 * **有时候连接设备按钮为灰色的,需要先打开模拟器或者连接真机设备,然后打开 `Android Studio`进行连接设备**
+* **每次修改了 `pubspec.yaml` 文件并且 `flutter pub get` 之后，需要在 `iOS` 工程执行 `pod install` 操作**
