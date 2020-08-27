@@ -501,3 +501,5 @@ class FirstRouteWidget extends StatelessWidget {
   ![断点调试操作](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200818174020.png)
 3. 打开 `Xcode` 进行 `run` 工程
 4. 这样就可以进行断点调试了.
+
+* **有时候连接设备按钮为灰色的,需要先打开模拟器或者连接真机设备,然后打开 `Android Studio`进行连接设备**
