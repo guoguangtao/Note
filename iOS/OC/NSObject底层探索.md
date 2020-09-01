@@ -60,8 +60,8 @@
 typedef struct objc_class *Class;
 ```
 
-紧接着看 `objc_class` 这个结构体,通过查看源码 [objc4-781.tar.gz](https://opensource.apple.com/tarballs/objc4/) 了解 `objc_class` 这个结构体的组成结构(`objc-runtime-new.h` 文件,搜索 `struct objc_class :`)
-主要代码如下
+紧接着看 `objc_class` 这个结构体,通过查看源码 [objc4-781.tar.gz](https://opensource.apple.com/tarballs/objc4/) 了解 `objc_class` 这个结构体的组成结构(`objc-runtime-new.h` 文件,搜索 `struct objc_class :`),
+在这里主要是粘贴了属性.
 
 ```C++
 struct objc_class : objc_object {
