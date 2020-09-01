@@ -42,3 +42,33 @@
 
 @end
 ```
+
+## `NSObject` 定义
+
+```Objective-C
+@interface NSObject <NSObject> {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-interface-ivars"
+    Class isa  OBJC_ISA_AVAILABILITY;
+#pragma clang diagnostic pop
+}
+```
+
+而 `Class` 在 `OC` 中的定义为
+
+```Objective-C
+typedef struct objc_class *Class;
+```
+
+紧接着看 `objc_class` 这个结构体,通过查看源码 [objc4-781.tar.gz](https://opensource.apple.com/tarballs/objc4/) 了解 `objc_class` 这个结构体的组成结构(`objc-runtime-new.h` 文件,搜索 `struct objc_class :`)
+主要代码如下
+
+```C++
+struct objc_class : objc_object {
+    // Class ISA;
+    Class superclass;
+    cache_t cache;             // formerly cache pointer and vtable
+    class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
+}
+```
+
