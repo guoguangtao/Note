@@ -71,4 +71,19 @@ struct objc_class : objc_object {
     class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
 }
 ```
+再查看 `objc_object` 结构
+
+```C++
+struct objc_object {
+private:
+    isa_t isa;
+
+public:
+
+    // ISA() assumes this is NOT a tagged pointer object
+    Class ISA();
+    ...
+}
+```
+
 
