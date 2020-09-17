@@ -77,13 +77,28 @@ struct objc_class : objc_object {
 struct objc_object {
 private:
     isa_t isa;
-
-public:
-
-    // ISA() assumes this is NOT a tagged pointer object
-    Class ISA();
-    ...
 }
 ```
+
+查看 `isa_t` 
+
+```c
+union isa_t {
+    isa_t() { }
+    isa_t(uintptr_t value) : bits(value) { }
+
+    Class cls;
+    uintptr_t bits;
+#if defined(ISA_BITFIELD)
+    struct {
+        ISA_BITFIELD;  // defined in isa.h
+    };
+#endif
+};
+```
+
+![源码定义转换成类图](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200917171821.png)
+
+
 
 
