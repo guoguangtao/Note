@@ -99,6 +99,12 @@ union isa_t {
 
 ![源码定义转换成类图](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200917171821.png)
 
+借用[霜神](https://juejin.im/post/6844903444449329159)的图展示源码的定义转成类图
+
+**OC对象在底层的实现都是通过 C/C++ 结构体实现的**
+
+
+
 
 
 
