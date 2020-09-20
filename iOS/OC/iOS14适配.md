@@ -52,3 +52,17 @@ datePicer.frame = frame;
 
 ![设置并重新设置了 frame](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200920183609.png)
 
+
+### UITableViewCell
+
+在 iOS 14 环境下，UITableViewCell 的结构如下：
+
+![iOS 14 UITableViewCell 结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200920184327.png)
+
+而在 iOS 14 之前，UITableViewCell 的结构如下：
+
+![iOS 14 之前 UITableViewCell 结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200920184751.png)
+
+对比可以发现，iOS14 多了一个 `_UISystemBackgroundView` 和一个子视图
+如果我们在cell 中创建新的 UI 控件，然后直接添加到 cell 中，
+
