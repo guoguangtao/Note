@@ -55,16 +55,16 @@ datePicer.frame = frame;
 
 ### UITableViewCell
 
-在 iOS 14 环境下，UITableViewCell 的结构如下：
+在 iOS 14 环境下，`UITableViewCell` 的结构如下：
 
 ![iOS 14 UITableViewCell 结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200920184327.png)
 
-而在 iOS 14 之前，UITableViewCell 的结构如下：
+而在 iOS 14 之前，`UITableViewCell` 的结构如下：
 
 ![iOS 14 之前 UITableViewCell 结构](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200920184751.png)
 
 对比可以发现，iOS14 多了一个 `_UISystemBackgroundView` 和一个子视图
-如果我们在cell 中创建新的 UI 控件，然后直接添加到 cell 中,所以在 iOS14 下,如果直接讲 UI 空间添加到 cell 上面,默认会放在 contentView 下面,如果有一些交互事件,这时候是无法响应的,因为被 contentView 给挡住了,所以需要添加到 contentView 上面.
+如果我们在`cell` 中创建新的 UI 控件，然后直接添加到 `cell` 中,所以在 iOS14 下,如果直接讲 UI 空间添加到 `cell` 上面,默认会放在 `contentView` 下面,如果有一些交互事件,这时候是无法响应的,因为被 `contentView` 给挡住了,所以需要添加到 `contentView` 上面.
 
 ### UIPageControl
 
@@ -113,4 +113,61 @@ iOS 14 之后环境
 ![20200921114547](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200921114547.png)
 
 
+### CALayer 的 mask
 
+公司所在的项目中,聊天界面利用`CALayer`的 `mask`方式将背景弄成一个气泡的样式,在 `iOS 14` 之前是好的,但是在 `iOS 14` 上就显示不出来了.具体的方式是将一个气泡图片,用一个 `UIImageView` 加载出来,然后将这个气泡的 `ImageView` 的 `layer` 作为一个遮罩,放在图片消息上面去.
+代码类似下面的:
+
+```Objective-C
+UIImageView *imageView = [UIImageView new];
+imageView.image = [UIImage imageNamed:@"calendar"];
+imageView.size = CGSizeMake(200, 200);
+imageView.center = self.center;
+[self addSubview:imageView];
+    
+UIImageView *imgView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, 150, 80)];
+imgView.image = [UIImage imageNamed:@"green_pop"];
+imageView.layer.mask = imgView.layer;
+```
+
+以上代码运行结果,在不同的环境下,显示出来的效果不一样
+
+![20200922182808](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200922182808.png)
+
+![20200922182937](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200922182937.png)
+
+`iOS14` 显示不出来,但是在 `iOS12.4` 却能显示出来
+
+后面在添加到 `imageView.layer.mask` 之前,将 `imgView` 添加到某个视图上去,发现在 `iOS 14` 上又能显示出来,所以想是不是在 `iOS14` 上的渲染逻辑发生了改变
+
+![20200922190031](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/20200922190031.png)
+
+```Objective-C
+UIImageView *imageView = [UIImageView new];
+imageView.image = [UIImage imageNamed:@"calendar"];
+imageView.size = CGSizeMake(200, 200);
+imageView.center = self.center;
+[self addSubview:imageView];
+
+UIImageView *imgView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, 150, 80)];
+imgView.image = [UIImage imageNamed:@"green_pop"];
+[imageView addSubview:imgView];
+imageView.layer.mask = imgView.layer;
+```
+
+其实可以直接使用 `layer` 的 `content` 进行设置图片
+
+![将图片赋值到 content.png](https://upload-images.jianshu.io/upload_images/662079-66fcc5463bd462ce.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
+```Objective-C
+UIImageView *imageView = [UIImageView new];
+imageView.image = [UIImage imageNamed:@"calendar"];
+imageView.size = CGSizeMake(200, 200);
+imageView.center = self.center;
+[self addSubview:imageView];
+CALayer *maskLayer = [[CALayer alloc] init];
+maskLayer.frame = CGRectMake(0, 0, 180, 90);
+maskLayer.contents = (__bridge id)[UIImage imageNamed:@"green_pop"].CGImage;
+imageView.layer.mask = maskLayer;
+```
+这样也能显示出来
