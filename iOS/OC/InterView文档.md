@@ -39,18 +39,30 @@
 > * 第二位: 表示一些小的改动,如果是 SDK 则意味着增加了一个功能,方法名没有改动过,不影响之前的使用
 > * 第三位: 表示对一些 BUG 的修复
 
-6. CocoaPods 的理解
+6. CocoaPods 的理解?
 
-7. CocoaPods 中的 pod install 和 pod update 的区别
+7. CocoaPods 中的 pod install 和 pod update 的区别?
 
-8. KVC
+8. KVC?
 
-9. 消息机制
+9. 消息机制?
 
 10. NSRunLoop? NSRunLoop 的组成?
 
-11. 如何查找项目中使用到了 UIWebView
+11. 如何查找项目中使用到了 UIWebView?
 
-12. WKWebView 与 H5 交互到底做了什么事情
+12. WKWebView 与 H5 交互到底做了什么事情?
 
-13. 
+13. emoji 表情的截取?
+
+14. Socket 如果发送过长的文本需要做什么处理?
+
+15. 如何查找 ViewA 和 ViewB 两个视图第一个共同的父视图?
+
+16. 事件响应链?
+
+17. iOS 多线程?
+
+18. block 为什么 __strong 能延迟释放?
+
+19. block 的循环引用? 为什么 __weak 就能避免循环引用,做了什么?
