@@ -32,4 +32,25 @@
     * 手动调用 `willChangeValueForKey:` 和 `didChangeValueForKey:` 方法
 > 5. 直接修改成员变量并不会触发 KVO 
 
-5.
+5. 版本号的含义
+
+> 比如 2.3.0
+> * 第一位: 表示大版本变化,如果经过一个大版本就加 1,如果是 SDK,则意味着可能之前的一些方法名发生了改变,在新的版本受影响
+> * 第二位: 表示一些小的改动,如果是 SDK 则意味着增加了一个功能,方法名没有改动过,不影响之前的使用
+> * 第三位: 表示对一些 BUG 的修复
+
+6. CocoaPods 的理解
+
+7. CocoaPods 中的 pod install 和 pod update 的区别
+
+8. KVC
+
+9. 消息机制
+
+10. NSRunLoop? NSRunLoop 的组成?
+
+11. 如何查找项目中使用到了 UIWebView
+
+12. WKWebView 与 H5 交互到底做了什么事情
+
+13. 
