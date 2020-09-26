@@ -171,3 +171,16 @@ maskLayer.contents = (__bridge id)[UIImage imageNamed:@"green_pop"].CGImage;
 imageView.layer.mask = maskLayer;
 ```
 这样也能显示出来
+
+
+### AssetsLibrary
+
+`AssetsLibrary` 在 iOS9 已经开始被弃用了，但是一些老的项目还在使用这个库进行相册访问，经过测试，同样的代码，在 iOS 14 下拿到相册中的图片之后，获取图片的大小已经获取不到了
+
+iOS14 之前获取图片大小情况
+
+![iOS14之前AssetsLibrary获取图片大小](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/iOS14%E4%B9%8B%E5%89%8DAssetsLibrary%E8%8E%B7%E5%8F%96%E5%9B%BE%E7%89%87%E5%A4%A7%E5%B0%8F.png)
+
+iOS 14 获取图片大小情况
+
+![iOS14 AssetsLibrary获取图片大小](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/iOS14%20AssetsLibrary%E8%8E%B7%E5%8F%96%E5%9B%BE%E7%89%87%E5%A4%A7%E5%B0%8F.png)
