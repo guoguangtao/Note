@@ -74,3 +74,11 @@
 22. 设计模式 - 工厂模式 ?
 
 23. 设计模式 - 观察者模式(KVO) ?
+
+24. Extension 和 Category 的区别?
+
+25. Flutter 生命周期?
+
+26. StateFullWidget 和 StateLessWidget 的区别 
+
+27. Flutter 的渲染?
