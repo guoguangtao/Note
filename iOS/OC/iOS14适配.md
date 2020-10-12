@@ -184,3 +184,55 @@ iOS14 之前获取图片大小情况
 iOS 14 获取图片大小情况
 
 ![iOS14 AssetsLibrary获取图片大小](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/iOS14%20AssetsLibrary%E8%8E%B7%E5%8F%96%E5%9B%BE%E7%89%87%E5%A4%A7%E5%B0%8F.png)
+
+
+### PHPickerViewController 的使用
+
+在 iOS14 增加了一个 `PHPickerViewController` 对相册的访问,替代 `UIImagePickerController`.
+
+我们可以在 `UIImagePickerController.h` 文件中看到,苹果推荐使用 `PHPickerViewController` 去访问相册
+
+![UIImagePickerController替换提示](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/UIImagePickerController%E6%9B%BF%E6%8D%A2%E6%8F%90%E7%A4%BA.jpg)
+
+首先,创建一个 `PHPickerConfiguration` 进行一些配置
+
+```Objective-C
+PHPickerConfiguration *configuration = [PHPickerConfiguration new];
+configuration.filter = [PHPickerFilter imagesFilter]; // 设置所选的类型,这里设置是图片,默认是 nil,设置成 nil 则代表所有的类型都显示出来(包括 视频/LivePhoto )
+configuration.selectionLimit = 10; // 设置可选择的最大数,默认为 1
+```
+
+创建 `PHPickerViewController` , 并进行跳转
+
+```Objective-C
+PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:configuration];
+picker.delegate = self;
+picker.modalPresentationStyle = UIModalPresentationFullScreen;
+[self presentViewController:picker animated:YES completion:nil];
+```
+
+实现代理方法 `picker:didFinishPicking:results`
+
+```Objective-C
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results  API_AVAILABLE(ios(14)){
+    
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    if (!results || !results.count) return;
+    // 遍历获取到的结果
+    for (PHPickerResult *result in results) {
+        NSItemProvider *itemProvider = result.itemProvider;
+        if ([itemProvider canLoadObjectOfClass:UIImage.class]) {
+            [itemProvider loadObjectOfClass:UIImage.class
+                          completionHandler:^(__kindof id<NSItemProviderReading>  _Nullable object, NSError * _Nullable error) {
+                // 取出图片
+                if (!error && object && [object isKindOfClass:UIImage.class]) {
+                    NSLog(@"%@", object);
+                }
+            }];
+        }
+    }
+}
+```
+
+![PHPickerViewController的使用](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/PHPickerViewController%E7%9A%84%E4%BD%BF%E7%94%A8.gif)
+
