@@ -6,7 +6,7 @@
 
 #### 分类编译之后的底层结构
 
-* 对当前已存在的类，新建一个分类（此处创建的是一个名为 `YXCPerson+Test` 的分类），然后使用 `clang` 将当前创建的分类进行转换
+* 1.1 对当前已存在的类，新建一个分类（此处创建的是一个名为 `YXCPerson+Test` 的分类），然后使用 `clang` 将当前创建的分类进行转换
     `YXCPerson+Test.h` 文件
     ```Objective-C
     // 属性：age 、num 还有一个 不同寻常的 custId 
@@ -34,7 +34,7 @@
     xcrun -sdk iphoneos clang -arch arm64 -rewrite-objc 分类名称.m
     ```
 
-* 底层结构展示
+* 1.2 底层结构展示
 
     ```C++
     struct _category_t {
@@ -47,7 +47,7 @@
     };
     ```
 
-    `_class_t` 底层结构
+* 1.3 `_class_t` 底层结构
 
     ```C++
     struct _class_t {
@@ -59,7 +59,7 @@
     };
     ```
 
-    `_class_ro_t` 底层结构
+* 1.4 `_class_ro_t` 底层结构
 
     ```C++
     struct _class_ro_t {
@@ -76,7 +76,7 @@
     };
     ```
 
-    `YXCPerson+Test` 分类在底层结构为
+* 1.5 `YXCPerson+Test` 分类在底层结构为
 
     ```C++
     static struct _category_t _OBJC_$_CATEGORY_YXCPerson_$_Test __attribute__ ((used, section ("__DATA,__objc_const"))) = 
@@ -90,19 +90,108 @@
     };
     ```
     可以发现，在编译之后 `YXCPerson+Test` 这个分类，在底层的结构是一个 `_category_t` 类型，并且名称为 `_OBJC_$_CATEGORY_YXCPerson_$_Test` 的结构体。由此可以推测，每个分类在编译之后，都是一个 `_category_t` 类型，并且命名按照 `_OBJC_$_CATEGORY_已存在的类名_$_分类名称` 这样的一个方式。
+     
+* 1.6 实例（对象）方法
 
-    首先看 `_OBJC_$_CATEGORY_INSTANCE_METHODS_YXCPerson_$_Test` 这样的一个结构体，顾名思义这是存储着我们当前这个分类的一些实例方法数据，并且为 _method_list_t 类型的结构体
+    `_OBJC_$_CATEGORY_INSTANCE_METHODS_YXCPerson_$_Test` 这样的一个结构体，顾名思义这是存储着我们当前这个分类的一些实例方法数据，并且为 `_method_list_t` 类型的结构体
 
     ```C++
     static struct /*_method_list_t*/ {
         unsigned int entsize;  // sizeof(struct _objc_method)
-        unsigned int method_count;
-        struct _objc_method method_list[2];
+        unsigned int method_count; // 实例方法的数量
+        struct _objc_method method_list[2]; // 方法列表，在这里有两个方法
     } _OBJC_$_CATEGORY_INSTANCE_METHODS_YXCPerson_$_Test __attribute__ ((used, section ("__DATA,__objc_const"))) = {
-        sizeof(_objc_method),
-        2,
-        {{(struct objc_selector *)"test", "v16@0:8", (void *)_I_YXCPerson_Test_test},
-        {(struct objc_selector *)"eat", "v16@0:8", (void *)_I_YXCPerson_Test_eat}}
+        sizeof(_objc_method), // 获取到 _objc_method 结构体的所需要的内存空间大小，赋值到 entsize
+        2, // method_count 为 2
+        {
+            {(struct objc_selector *)"test", "v16@0:8", (void *)_I_YXCPerson_Test_test},
+            {(struct objc_selector *)"eat", "v16@0:8", (void *)_I_YXCPerson_Test_eat}
+        } // 将 test()、eat() 方法放入一个数组，然后赋值给 method_list
     };
     ```
+
+    `struct objc_selector` 实际上是一个 `SEL`
+
+    ```C++
+    typedef struct objc_selector *SEL;
+    ```
+
+    `_objc_method` 结构为
+
+    ```C++
+    struct _objc_method {
+        struct objc_selector * _cmd; // SEL 地址
+        const char *method_type; // 方法签名
+        void  *_imp; // 方法实现
+    };
+    ```
+
+    **通过以上分析，可以总结出：**
+
+    > 1. OC 中实例（对象）方法在底层的实现是一个 `_objc_method` 类型的结构体，它包含了方法的声明、签名以及实现，编译器会将方法的声明、签名、实现信息放入到这个结构体当中存储起来。
+    >
+    > 2. 将一个个的实例（对象）方法通过 `_objc_method` 结构体存储好后，放入一个 `_method_list_t` 结构体中的 `method_list` 数组中(这个数组的个数会根据当前分类的方法个数，分配空间)，同时按照 `_OBJC_$_CATEGORY_INSTANCE_METHODS_原类名称_$_分类名称` 这样的一个格式给这个结构体取名。
+    >
+    > 3. 最后将 `_method_list_t` 类型的赋值给 `_category_t` 中的 `instance_methods`，这样就将当前分类中的实例（对象）方法存储到了当前分类结构体中去了。
+
+* 1.7 类方法
+
+    类方法存储到一个名为 `_OBJC_$_CATEGORY_CLASS_METHODS_YXCPerson_$_Test` 的结构体，这个结构体也是一个 `_method_list_t`，跟实例（对象）方法的原理是一致的。
+
+    ```C++
+
+    static struct /*_method_list_t*/ {
+        unsigned int entsize;  // sizeof(struct _objc_method)
+        unsigned int method_count; // 类方法个数
+        struct _objc_method method_list[1]; // 存放着 _objc_method 类型的结构体数组
+    } _OBJC_$_CATEGORY_CLASS_METHODS_YXCPerson_$_Test __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+        sizeof(_objc_method),
+        1,
+        {{(struct objc_selector *)"sing", "v16@0:8", (void *)_C_YXCPerson_Test_sing}}
+    };
+
+    ```
+
+* 1.8 协议信息
+
+    协议信息存储到了一个名为 `_OBJC_CATEGORY_PROTOCOLS_$_YXCPerson_$_Test` 的 `_protocol_list_t` 类型的结构体中，`_protocol_list_t` 结构体。
+
+    ```C++
+    static struct /*_protocol_list_t*/ {
+        long protocol_count;  // Note, this is 32/64 bit
+        struct _protocol_t *super_protocols[2];
+    } _OBJC_CATEGORY_PROTOCOLS_$_YXCPerson_$_Test __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+        2,
+        &_OBJC_PROTOCOL_NSCopying,
+        &_OBJC_PROTOCOL_NSCoding
+    };
+    ```
+
+* 1.9 属性信息
+
+    属性信息存储到了一个名为 `_OBJC_$_PROP_LIST_YXCPerson_$_Test` 的 `_prop_list_t` 类型的结构体，其中这个结构体中有一个 `prop_list` 属性，里面存放的就是当前分类所有的属性，当然在底层的结构是一个 `_prop_t` 结构体。
+
+    ```C++
+    static struct /*_prop_list_t*/ {
+        unsigned int entsize;  // sizeof(struct _prop_t)
+        unsigned int count_of_properties;
+        struct _prop_t prop_list[2];
+    } _OBJC_$_PROP_LIST_YXCPerson_$_Test __attribute__ ((used, section ("__DATA,__objc_const"))) = {
+        sizeof(_prop_t),
+        2,
+        {{"age","Ti,N"},
+        {"num","Ti,N"}}
+    };
+
+    struct _prop_t {
+        const char *name;
+        const char *attributes;
+    };
+    ```
+
+
+
+
+
+
 
