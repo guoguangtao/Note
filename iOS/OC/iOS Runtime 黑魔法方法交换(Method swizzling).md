@@ -84,7 +84,7 @@ NSLog(@"%@", [string substringToIndex:10]);
     * 创建一个 `Person` 对象时，调用 `init` 方法，运行时会去查找 `yxc_init` 的实现，因为 `yxc_init` 方法是 `Person` 自身的方法，所以查找到了直接调用。（消息发送机制）
     * 而创建一个 `NSObject` 对象时，调用 `init` 方法，运行时去查找 `yxc_init` 方法的时候，`NSObject` 是没有这个方法，这个方法存在于 `Person` 类中，所以查找完毕，还是找不到这个方法，就抛异常了。
 
-**正确的 `hook` 做法是，先将 `init` 方法添加到 `Person` 类中，如果这个类当前有这个方法（而不是父类），则不添加，直接 `exchange`，否则添加了 `init` 方法，然后再将 `yxc_init` 方法的实现替换成 `init` 方法的实现。**
+**正确的 `hook` 做法是，先将 `init` 方法添加到 `Person` 类中，如果这个类当前有这个方法（而不是父类），则不添加，直接 `exchange`，否则添加了 `init` 方法，然后再将 `yxc_init` 方法的实现设置成 `init` 方法的实现。**
 
 ```Objective-C
 + (void)load {
