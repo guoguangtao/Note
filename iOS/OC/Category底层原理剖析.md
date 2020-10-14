@@ -197,7 +197,67 @@
 
  下面通过源码来查看这个过程，下载[最新的源码](https://opensource.apple.com/tarballs/objc4/) 
 
- 
+ 1. 找到 `objc-os.mm` 文件，并且找到 `_objc_init` 函数，在 `_objc_init` 函数中有一个 `_dyld_objc_notify_register` 函数，这个函数第一个参数传入了一个镜像（`map_images`）
+
+ ```C++
+ /***********************************************************************
+* _objc_init
+* Bootstrap initialization. Registers our image notifier with dyld.
+* Called by libSystem BEFORE library initialization time
+**********************************************************************/
+
+void _objc_init(void)
+{
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+    
+    // fixme defer initialization until an objc-using image is found?
+    environ_init();
+    tls_init();
+    static_init();
+    runtime_init();
+    exception_init();
+    cache_init();
+    _imp_implementationWithBlock_init();
+
+    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+
+    #if __OBJC2__
+    didCallDyldNotifyRegister = true;
+    #endif
+}
+ ```
+
+ 2. 在 `objc-runtime-new.mm` 文件中，找到 `map_images` 函数，发现返回的结果是通过调用 `map_images_nolock` 函数得到的结果
+
+ ```C++
+ /***********************************************************************
+* map_images
+* Process the given images which are being mapped in by dyld.
+* Calls ABI-agnostic code after taking ABI-specific locks.
+*
+* Locking: write-locks runtimeLock
+**********************************************************************/
+void
+map_images(unsigned count, const char * const paths[],
+           const struct mach_header * const mhdrs[])
+{
+    mutex_locker_t lock(runtimeLock);
+    return map_images_nolock(count, paths, mhdrs);
+}
+ ```
+
+ 3. 在 `objc-os.mm` 文件中找到 `map_images_nolock` 函数，查看该函数
+
+ ```C++
+ ...
+ if (hCount > 0) {
+    _read_images(hList, hCount, totalClasses, unoptimizedTotalClasses);
+ }
+ ```
+
+ 4. 跳转到 _read_images 函数中查看，位于 `objc-runtime-new.mm`
 
 
 
