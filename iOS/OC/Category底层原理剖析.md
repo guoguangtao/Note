@@ -195,69 +195,144 @@
  > 2. 把所有分类的方法、属性、协议数据，合并到一个数组中，后参与编译的分类数据，会在数组的最前面
  > 3. 将合并后的分类数据（方法、属性、协议），插入到类原来数据的前面
 
- 下面通过源码来查看这个过程，下载[最新的源码](https://opensource.apple.com/tarballs/objc4/) 
+下面通过源码来查看这个过程，下载[最新的源码](https://opensource.apple.com/tarballs/objc4/) 
 
- 1. 找到 `objc-os.mm` 文件，并且找到 `_objc_init` 函数，在 `_objc_init` 函数中有一个 `_dyld_objc_notify_register` 函数，这个函数第一个参数传入了一个镜像（`map_images`）
+1. 找到 `objc-os.mm` 文件，并且找到 `_objc_init` 函数，在 `_objc_init` 函数中有一个 `_dyld_objc_notify_register` 函数，这个函数第一个参数传入了一个镜像（`map_images`）
 
- ```C++
- /***********************************************************************
-* _objc_init
-* Bootstrap initialization. Registers our image notifier with dyld.
-* Called by libSystem BEFORE library initialization time
-**********************************************************************/
+    ```C++
+    /***********************************************************************
+    * _objc_init
+    * Bootstrap initialization. Registers our image notifier with dyld.
+    * Called by libSystem BEFORE library initialization time
+    **********************************************************************/
 
-void _objc_init(void)
-{
-    static bool initialized = false;
-    if (initialized) return;
-    initialized = true;
-    
-    // fixme defer initialization until an objc-using image is found?
-    environ_init();
-    tls_init();
-    static_init();
-    runtime_init();
-    exception_init();
-    cache_init();
-    _imp_implementationWithBlock_init();
+    void _objc_init(void)
+    {
+        static bool initialized = false;
+        if (initialized) return;
+        initialized = true;
+        
+        // fixme defer initialization until an objc-using image is found?
+        environ_init();
+        tls_init();
+        static_init();
+        runtime_init();
+        exception_init();
+        cache_init();
+        _imp_implementationWithBlock_init();
 
-    _dyld_objc_notify_register(&map_images, load_images, unmap_image);
+        _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 
-    #if __OBJC2__
-    didCallDyldNotifyRegister = true;
-    #endif
-}
- ```
+        #if __OBJC2__
+        didCallDyldNotifyRegister = true;
+        #endif
+    }
+    ```
 
- 2. 在 `objc-runtime-new.mm` 文件中，找到 `map_images` 函数，发现返回的结果是通过调用 `map_images_nolock` 函数得到的结果
+2. 在 `objc-runtime-new.mm` 文件中，找到 `map_images` 函数，发现返回的结果是通过调用 `map_images_nolock` 函数得到的结果
 
- ```C++
- /***********************************************************************
-* map_images
-* Process the given images which are being mapped in by dyld.
-* Calls ABI-agnostic code after taking ABI-specific locks.
-*
-* Locking: write-locks runtimeLock
-**********************************************************************/
-void
-map_images(unsigned count, const char * const paths[],
-           const struct mach_header * const mhdrs[])
-{
-    mutex_locker_t lock(runtimeLock);
-    return map_images_nolock(count, paths, mhdrs);
-}
- ```
+    ```C++
+    /***********************************************************************
+    * map_images
+    * Process the given images which are being mapped in by dyld.
+    * Calls ABI-agnostic code after taking ABI-specific locks.
+    *
+    * Locking: write-locks runtimeLock
+    **********************************************************************/
+    void
+    map_images(unsigned count, const char * const paths[],
+            const struct mach_header * const mhdrs[])
+    {
+        mutex_locker_t lock(runtimeLock);
+        return map_images_nolock(count, paths, mhdrs);
+    }
+    ```
 
- 3. 在 `objc-os.mm` 文件中找到 `map_images_nolock` 函数，查看该函数
+3. 在 `objc-os.mm` 文件中找到 `map_images_nolock` 函数，查看该函数
 
- ```C++
- ...
- if (hCount > 0) {
-    _read_images(hList, hCount, totalClasses, unoptimizedTotalClasses);
- }
- ```
+    ```C++
+    ...
+    if (hCount > 0) {
+        _read_images(hList, hCount, totalClasses, unoptimizedTotalClasses);
+    }
+    ```
 
- 4. 跳转到 _read_images 函数中查看，位于 `objc-runtime-new.mm`
+4. 跳转到 `_read_images` 函数中查看，位于 `objc-runtime-new.mm`
+
+    ```C++
+    // Discover categories. Only do this after the initial category
+    // attachment has been done. For categories present at startup,
+    // discovery is deferred until the first load_images call after
+    // the call to _dyld_objc_notify_register completes. rdar://problem/53119145
+    if (didInitialAttachCategories) {
+        for (EACH_HEADER) {
+            // 加载分类信息
+            load_categories_nolock(hi);
+        }
+    }
+    ```
+
+5. 跳转到 `load_categories_nolock` 函数中查看
+
+    ```C++
+    ...
+    if (cat->instanceMethods ||  
+        cat->protocols ||  
+        cat->instanceProperties)
+        {
+            if (cls->isRealized()) {
+                // 拼接分类信息
+                attachCategories(cls, &lc, 1, ATTACH_EXISTING);
+            } else {
+                objc::unattachedCategories.addForClass(lc, cls);
+            }
+        }
+    ...
+    ```
+
+6. 跳转到 `attachCategories` 这个函数中查看
+
+    ```C++
+    ...
+    {
+        auto& entry = cats_list[i];
+
+        // 方法列表
+        method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
+        if (mlist) {
+            if (mcount == ATTACH_BUFSIZ) {
+                prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
+                rwe->methods.attachLists(mlists, mcount);
+                mcount = 0;
+            }
+            mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
+            fromBundle |= entry.hi->isBundle();
+        }
+
+        // 属性列表
+        property_list_t *proplist =
+            entry.cat->propertiesForMeta(isMeta, entry.hi);
+        if (proplist) {
+            if (propcount == ATTACH_BUFSIZ) {
+                rwe->properties.attachLists(proplists, propcount);
+                propcount = 0;
+            }
+            proplists[ATTACH_BUFSIZ - ++propcount] = proplist;
+        }
+
+        // 协议列表
+        protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
+        if (protolist) {
+            if (protocount == ATTACH_BUFSIZ) {
+                rwe->protocols.attachLists(protolists, protocount);
+                protocount = 0;
+            }
+            protolists[ATTACH_BUFSIZ - ++protocount] = protolist;
+        }
+    }
+    ...
+    ```
+
 
 
 
