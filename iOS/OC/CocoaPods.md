@@ -28,13 +28,13 @@ Commands:
     + list          List pods
     + outdated      Show outdated project dependencies(显示过时的第三方框架)
     + plugins       Show available CocoaPods plugins(显示可用的 CocoaPods 插件)
-    + repo          Manage spec-repositories（管理）
-    + search        Search for pods
-    + setup         Setup the CocoaPods environment
+    + repo          Manage spec-repositories(管理规格仓库)
+    + search        Search for pods（查找第三方框架）
+    + setup         Setup the CocoaPods environment（设置 CocoaPods 环境）
     + spec          Manage pod specs
     + trunk         Interact with the CocoaPods API (e.g. publishing new specs)
     + try           Try a Pod!
-    + update        Update outdated project dependencies and create new Podfile.lock
+    + update        Update outdated project dependencies and create new Podfile.lock（更新过时的项目依赖项并创建新的Podfile.lock）
 
 Options:
 

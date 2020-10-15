@@ -301,6 +301,7 @@
         method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
         if (mlist) {
             if (mcount == ATTACH_BUFSIZ) {
+                //
                 prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
                 rwe->methods.attachLists(mlists, mcount);
                 mcount = 0;
