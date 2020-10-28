@@ -127,31 +127,80 @@ NSLog(@"%@", [string substringToIndex:10]);
 
 通过这样的方式进行对 **父类或者基类** 方法的 `hook`，最终没有发现其他异常，以此记录。
 
-最后封装一下 hook 逻辑操作
+最后封装一下 `hook` 逻辑操作
 
 ```Objective-C
-/// hook 方法
-/// @param cls 类
+/// hook 方法 （主要是为了 hook 某个类的 簇类 方法）
+/// @param originCls 需要 hook 的类
+/// @param currentCls 当前类
 /// @param originSelector 将要 hook 掉的方法
 /// @param swizzledSelector 新的方法
-+ (void)hookMethod:(Class)cls originSelector:(SEL)originSelector swizzledSelector:(SEL)swizzledSelector {
+/// @param clsMethod 是否是类方法
++ (void)hookOriginClass:(Class)originCls
+           currentClass:(Class)currentCls
+         originSelector:(SEL)originSelector
+       swizzledSelector:(SEL)swizzledSelector
+            classMethod:(BOOL)clsMethod {
     
-    Method origin_method = class_getInstanceMethod(cls, originSelector);
-    Method swizzled_method = class_getInstanceMethod(cls, swizzledSelector);
-    BOOL addSuccess = class_addMethod(cls,
+    Method origin_method;
+    Method swizzled_method;
+    
+    if (clsMethod) {
+        // 类方法
+        origin_method = class_getClassMethod(originCls, originSelector);
+        swizzled_method = class_getClassMethod(currentCls, swizzledSelector);
+    } else {
+        // 实例(对象)方法
+        origin_method = class_getInstanceMethod(originCls, originSelector);
+        swizzled_method = class_getInstanceMethod(currentCls, swizzledSelector);
+    }
+    
+    // 给当前类添加 originSelector 方法，方法实现为 swizzled_method
+    // 如果传入的是一个类方法，在这里需要将 元类对象传进去
+    Class addCls = clsMethod ? object_getClass(currentCls) : currentCls;
+    
+    BOOL addSuccess = class_addMethod(addCls,
                                       originSelector,
                                       method_getImplementation(swizzled_method),
-                                      method_getTypeEncoding(swizzled_method));
+                                      method_getTypeEncoding(swizzled_method)
+                                      );
+    
     if (addSuccess) {
-        class_replaceMethod(cls,
+        // 将当前类的 swizzledSelector 的实现替换成 origin_method
+        class_replaceMethod(addCls,
                             swizzledSelector,
                             method_getImplementation(origin_method),
-                            method_getTypeEncoding(origin_method));
+                            method_getTypeEncoding(origin_method)
+                            );
     } else {
         method_exchangeImplementations(origin_method, swizzled_method);
     }
 }
 ```
+
+#### 类簇（Class Clusters）
+
+`Class Clusters`（类簇）是抽象工厂模式在iOS下的一种实现，众多常用类，如 `NSString`，`NSArray`，`NSDictionary`，`NSNumber`都运作在这一模式下，它是接口简单性和扩展性的权衡体现，在我们完全不知情的情况下，偷偷隐藏了很多具体的实现类，只暴露出简单的接口。
+
+[官方文档讲解类簇](https://developer.apple.com/library/archive/documentation/General/Conceptual/CocoaEncyclopedia/ClassClusters/ClassClusters.html)
+
+下面对 `NSArray` 进行类簇讲解
+
+系统会创建 `__NSPlaceholderArray`、 `__NSSingleObjectArrayI`、 `__NSArray0`、 `__NSArrayM` 等一些类簇，下面对这些类簇进行 `hook` 操作
+
+```Objective-C
++ (void)load {
+    
+    [self hookOriginClass:NSClassFromString(@"__NSPlaceholderArray") currentClass:[NSArray class] originSelector:@selector(initWithObjects:count:) swizzledSelector:@selector(yxc_initWithObjects:count:) classMethod:NO];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSSingleObjectArrayI") currentClass:[NSArray class] originSelector:@selector(objectAtIndex:) swizzledSelector:@selector(yxc_objectAtIndex:) classMethod:NO];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSArray0") currentClass:[NSArray class] originSelector:@selector(objectAtIndex:) swizzledSelector:@selector(yxc_objectAtIndex1:) classMethod:NO];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSArrayM") currentClass:[NSArray class] originSelector:@selector(objectAtIndexedSubscript:) swizzledSelector:@selector(yxc_objectAtIndexedSubscript:) classMethod:NO];
+}
+```
+
 
 `class_addMethod` 函数官方文档描述
 
