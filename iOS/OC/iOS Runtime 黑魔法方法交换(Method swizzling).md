@@ -201,6 +201,105 @@ NSLog(@"%@", [string substringToIndex:10]);
 }
 ```
 
+这样就对数组中的一些方法进行 hook 完了，而且也并没有什么问题。
+
+到这里，就有一个疑问：**在这里替换同一个 `SEL` 为 `objectAtIndex:`，而这个方法是属于 `NSArray` 这个类，为什么这里替换了两次，彼此都没有影响到，按理来说根据同一个 `SEL` 获取到的 `IMP` 进行 `replace` 或者 `exchange`，那么最后生效的应该是最后一次进行 `hook` 的方法实现，但是经过发现，没有受影响。**
+
+首先类簇是需要继承于原来那个类，在原来那个类的基础上衍生了许多类出来，下面我们用代码证明这一点。
+
+```Objective-C
+Class __NSArrayM = NSClassFromString(@"__NSArrayM");
+Class __NSArray0 = NSClassFromString(@"__NSArray0");
+Class __NSSingleObjectArrayI = NSClassFromString(@"__NSSingleObjectArrayI");
+Class __NSPlaceholderArray = NSClassFromString(@"__NSPlaceholderArray");
+
+NSLog(@"__NSArrayM -> superclass : %@", class_getSuperclass(__NSArrayM));
+NSLog(@"__NSArray0 -> superclass : %@", class_getSuperclass(__NSArray0));
+NSLog(@"__NSSingleObjectArrayI -> superclass : %@", class_getSuperclass(__NSSingleObjectArrayI));
+NSLog(@"__NSPlaceholderArray -> superclass : %@", class_getSuperclass(__NSPlaceholderArray));
+```
+
+输出结果：
+
+![NSArray 的类簇输出父类](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/NSArray%20%E7%9A%84%E7%B1%BB%E7%B0%87%E8%BE%93%E5%87%BA%E7%88%B6%E7%B1%BB.png)
+
+既然 SEL 是 NSArray 的方法，为什么在 hook 的时候，能 hook 到每个类簇对应的想法？
+
+**猜想：是不是每个类簇，都实现了 `objectAtIndex:` 这个方法，导致根据 `SEL` 获取到方法实现是不相同的**
+
+下面进行验证这个猜想
+
+```Objective-C
++ (void)load {
+    
+    [self hookOriginClass:NSClassFromString(@"__NSPlaceholderArray") currentClass:[NSArray class] originSelector:@selector(initWithObjects:count:) swizzledSelector:@selector(yxc_initWithObjects:count:) classMethod:NO];
+    
+    NSLog(@"交换前");
+    [self logInfo];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSSingleObjectArrayI") currentClass:[NSArray class] originSelector:@selector(objectAtIndex:) swizzledSelector:@selector(yxc_objectAtIndex:) classMethod:NO];
+    NSLog(@"__NSSingleObjectArrayI交换后");
+    [self logInfo];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSArray0") currentClass:[NSArray class] originSelector:@selector(objectAtIndex:) swizzledSelector:@selector(yxc_objectAtIndex1:) classMethod:NO];
+    NSLog(@"__NSArray0交换后");
+    [self logInfo];
+    
+    [self hookOriginClass:NSClassFromString(@"__NSArrayM") currentClass:[NSArray class] originSelector:@selector(objectAtIndexedSubscript:) swizzledSelector:@selector(yxc_objectAtIndexedSubscript:) classMethod:NO];
+    
+    
+}
+
++ (void)logInfo {
+    
+    Class singleObjectCls = NSClassFromString(@"__NSSingleObjectArrayI");
+    Class __NSArray0Cls = NSClassFromString(@"__NSArray0");
+    Class currentCls = [self class];
+    
+    SEL selector = @selector(objectAtIndex:);
+    
+    Method singleObjectClsMethod = class_getInstanceMethod(singleObjectCls, selector);
+    Method __NSArray0ClsMethod = class_getInstanceMethod(__NSArray0Cls, selector);
+    Method currentMethod = class_getInstanceMethod(currentCls, selector);
+    
+    
+    IMP singleObjectClsMethodIMP = method_getImplementation(singleObjectClsMethod);
+    IMP __NSArray0ClsMethodIMP = method_getImplementation(__NSArray0ClsMethod);
+    IMP currentIMP = method_getImplementation(currentMethod);
+    
+    NSLog(@"selector : %p, singleObjectClsMethod : %p, __NSArray0ClsMethod : %p, currentMethod : %p, singleObjectClsMethodIMP : %p, __NSArray0ClsMethodIMP : %p, currentIMP : %p",
+          selector, singleObjectClsMethod, __NSArray0ClsMethod, currentMethod, singleObjectClsMethodIMP, __NSArray0ClsMethodIMP, currentIMP);
+}
+```
+
+以上代码，在 `hook` `objectAtIndex:` 方法之前和 `hook` 完一个、两个之后对 `SEL`、`class`、`Method`、`IMP` 信息输出
+
+>2020-11-02 20:02:42.598040+0800 Block[32615:646190] 交换前==================
+>2020-11-02 20:02:42.598612+0800 Block[32615:646190] selector : 0x7fff7256d44e, singleObjectClsMethod : 0x7fff85fe75c0, __NSArray0ClsMethod : 0x7fff85fcd260, currentMethod : 0x7fff85fda938, singleObjectClsMethodIMP : 0x7fff2e31daf6, __NSArray0ClsMethodIMP : 0x7fff2e41e13b, currentIMP : 0x7fff2e4629fe
+>2020-11-02 20:02:42.598878+0800 Block[32615:646190] __NSSingleObjectArrayI交换后======================
+>2020-11-02 20:02:42.598970+0800 Block[32615:646190] selector : 0x7fff7256d44e, singleObjectClsMethod : 0x7fff85fe75c0, __NSArray0ClsMethod : 0x7fff85fcd260, currentMethod : 0x7fff85fda938, singleObjectClsMethodIMP : 0x100003750, __NSArray0ClsMethodIMP : 0x7fff2e41e13b, currentIMP : 0x7fff2e4629fe
+>2020-11-02 20:02:42.599166+0800 Block[32615:646190] __NSArray0交换后===================
+>2020-11-02 20:02:42.599275+0800 Block[32615:646190] selector : 0x7fff7256d44e, singleObjectClsMethod : 0x7fff85fe75c0, __NSArray0ClsMethod : 0x7fff85fcd260, currentMethod : 0x7fff85fda938, singleObjectClsMethodIMP : 0x100003750, __NSArray0ClsMethodIMP : 0x1000037d0, currentIMP : 0x7fff2e4629fe
+
+**根据输出的地址，可以看出根据不同的类簇获取到的 Method 的方法结构体地址也是不同一个，还有方法实现的地址也是不同一块存储空间，那就证明了猜想，根据 SEL 获取到的 Method 和 IMP 不同一个，可能是在每个类簇内部对父类NSArray 的 `objectAtIndex:` 重新实现了一下，导致获取到的并不是同一个。**
+
+为了验证是否**子类重写了父类的方法获取到的并不是同一个**（原理来讲是不同一个的，下面用代码来验证这个想法）
+
+新建一个 `Person` 类，并且声明一个 `test` 对象方法并实现，然后创建一个 `Student` 类，继承于 `Person` 类，先不重写父类的 `test` 方法。
+
+![子类未重写父类方法获取 classMethod和 IMP 地址](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/%E5%AD%90%E7%B1%BB%E6%9C%AA%E9%87%8D%E5%86%99%E7%88%B6%E7%B1%BB%E6%96%B9%E6%B3%95%E8%8E%B7%E5%8F%96%20classMethod%E5%92%8C%20IMP%20%E5%9C%B0%E5%9D%80.png)
+
+`Student` 未重写父类 `Person` 的 `test` 方法，通过各自获取到的 `Method` 和 `IMP` 的地址都是同一个
+
+下面 `Student` 进行重写 `test` 方法
+
+![子类重写父类方法获取 classMethod和 IMP 地址](https://raw.githubusercontent.com/guoguangtao/VSCodePicGoImages/master/%E5%AD%90%E7%B1%BB%E9%87%8D%E5%86%99%E7%88%B6%E7%B1%BB%E6%96%B9%E6%B3%95%E8%8E%B7%E5%8F%96%20classMethod%E5%92%8C%20IMP%20%E5%9C%B0%E5%9D%80.png)
+
+这时候发现，通过各自获取 `Method` 和 `IMP` 的地址已经不一样了
+
+这就验证了以上的猜想，****在类簇内部中，会对父类的一些方法进行重写。这就导致可能某一个方法，在一个类簇中已经进行了 hook，但是可能还是会出现方法名相同，但是类名不一样的方法报错，就像上面的 `objectAtIndex:` 方法一样，如果只是对 `__NSSingleObjectArrayI` 进行了替换或者交换方法操作，但是并没有对 `__NSArray0` 进行同样的操作，那么还是会出现索引超出界面，没有达到预防的效果。**
+
+
 
 `class_addMethod` 函数官方文档描述
 
