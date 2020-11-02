@@ -325,6 +325,113 @@ class_addMethod(Class _Nullable cls, SEL _Nonnull name, IMP _Nonnull imp,
     OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
 ```
 
+下面对 `class_addMethod` 进行源码分析
+
+```C
+/// cls 类名
+/// name 方法名
+/// imp 方法实现 
+/// types 方法签名
+BOOL class_addMethod(Class cls, SEL name, IMP imp, const char *types)
+{
+    // 没有传入 类名 直接返回 NO
+    if (!cls) return NO;
+
+    mutex_locker_t lock(runtimeLock);
+    // 开始添加方法，对返回的结果进行取反，这里返回的是一个 IMP 类型的结果
+    return ! addMethod(cls, name, imp, types ?: "", NO);
+}
+```
+
+```C
+/// cls 类名
+/// name 方法名
+/// imp 方法实现
+/// types 方法签名
+/// replace 是否直接替换，这里传入的是 NO
+static IMP addMethod(Class cls, SEL name, IMP imp, const char *types, bool replace)
+{
+    IMP result = nil;
+    
+    runtimeLock.assertLocked();
+
+    checkIsKnownClass(cls);
+    
+    ASSERT(types);
+    ASSERT(cls->isRealized());
+
+    method_t *m;
+    // 查找该方法
+    if ((m = getMethodNoSuper_nolock(cls, name))) {
+        // already exists 已经存在该方法
+        if (!replace) {
+            // 当 replace 为 NO 时，直接返回该方法的实现
+            result = m->imp;
+        } else {
+            // 当 replace 为 YES 时，通过 _method_setImplementation，直接将方法进行替换
+            result = _method_setImplementation(cls, m, imp);
+        }
+    } else {
+        // 该方法不存在，对传入的类进行动态添加方法
+        auto rwe = cls->data()->extAllocIfNeeded();
+
+        // fixme optimize
+        // 创建一个方法列表
+        method_list_t *newlist;
+        // 分配内存，并设置好 method_list_t 的值
+        newlist = (method_list_t *)calloc(sizeof(*newlist), 1);
+        newlist->entsizeAndFlags = 
+            (uint32_t)sizeof(method_t) | fixed_up_method_list;
+        newlist->count = 1;
+        newlist->first.name = name;
+        newlist->first.types = strdupIfMutable(types);
+        newlist->first.imp = imp;
+        // 准备方法合并到该类中
+        prepareMethodLists(cls, &newlist, 1, NO, NO);
+        // 开始合并
+        rwe->methods.attachLists(&newlist, 1);
+        flushCaches(cls);
+
+        result = nil;
+    }
+
+    return result;
+}
+```
+
+```C
+/// cls 类名
+/// sel 方法名
+static method_t *getMethodNoSuper_nolock(Class cls, SEL sel)
+{
+    runtimeLock.assertLocked();
+
+    ASSERT(cls->isRealized());
+    // fixme nil cls? 
+    // fixme nil sel?
+
+    auto const methods = cls->data()->methods();
+    for (auto mlists = methods.beginLists(),
+              end = methods.endLists();
+         mlists != end;
+         ++mlists)
+    {
+        // <rdar://problem/46904873> getMethodNoSuper_nolock is the hottest
+        // caller of search_method_list, inlining it turns
+        // getMethodNoSuper_nolock into a frame-less function and eliminates
+        // any store from this codepath.
+        method_t *m = search_method_list_inline(*mlists, sel);
+        if (m) return m;
+    }
+
+    return nil;
+}
+```
+
+
+
+
+
 `class_replaceMethod` 函数官方文档描述
 
 ```C
