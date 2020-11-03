@@ -545,5 +545,81 @@ IMP class_replaceMethod(Class cls, SEL name, IMP imp, const char *types)
 
 通过上面的 `addMethod` 源码分析
 
-* 当查找到方法已存在，直接通过 _method_setImplementation 方法将传入的方法实现，设置为查找目标方法的实现
+* 当查找到方法已存在，直接通过 `_method_setImplementation` 方法将传入的方法实现，设置为查找目标方法的实现
 * 当查找到方法不存在，动态添加到当前类中
+
+
+下面查看一下 `_method_setImplementation` 方法的实现原理
+
+```C
+static IMP _method_setImplementation(Class cls, method_t *m, IMP imp)
+{
+    runtimeLock.assertLocked();
+
+    if (!m) return nil;
+    if (!imp) return nil;
+    // 将旧的实现取出
+    IMP old = m->imp;
+    // 直接将新的实现方法设置到 method_t 的imp
+    m->imp = imp;
+
+    // Cache updates are slow if cls is nil (i.e. unknown)
+    // RR/AWZ updates are slow if cls is nil (i.e. unknown)
+    // fixme build list of classes whose Methods are known externally?
+
+    flushCaches(cls);
+
+    adjustCustomFlagsForMethodChange(cls, m);
+
+    // 返回旧的实现
+    return old;
+}
+```
+
+查看 `method_exchangeImplementations` 的方法实现原理
+
+```C
+void method_exchangeImplementations(Method m1, Method m2) {
+    if (!m1  ||  !m2) return;
+
+    mutex_locker_t lock(runtimeLock);
+    // 直接将传入的两个 Method 方法实现进行互换
+    IMP m1_imp = m1->imp;
+    m1->imp = m2->imp;
+    m2->imp = m1_imp;
+
+
+    // RR/AWZ updates are slow because class is unknown
+    // Cache updates are slow because class is unknown
+    // fixme build list of classes whose Methods are known externally?
+
+    flushCaches(nil);
+
+    adjustCustomFlagsForMethodChange(nil, m1);
+    adjustCustomFlagsForMethodChange(nil, m2);
+}
+```
+
+查看 `class_getInstanceMethod` 方法底层实现原理
+
+```C
+Method class_getInstanceMethod(Class cls, SEL sel)
+{
+    if (!cls  ||  !sel) return nil;
+
+    // This deliberately avoids +initialize because it historically did so.
+
+    // This implementation is a bit weird because it's the only place that 
+    // wants a Method instead of an IMP.
+
+#warning fixme build and search caches
+        
+    // Search method lists, try method resolver, etc.
+    lookUpImpOrForward(nil, sel, cls, LOOKUP_RESOLVER);
+
+#warning fixme build and search caches
+
+    return _class_getMethod(cls, sel);
+}
+```
+
