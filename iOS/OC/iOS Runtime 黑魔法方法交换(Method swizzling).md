@@ -530,3 +530,20 @@ class_replaceMethod(Class _Nullable cls, SEL _Nonnull name, IMP _Nonnull imp,
     OBJC_AVAILABLE(10.5, 2.0, 9.0, 1.0, 2.0);
 ```
 
+查看 `` 源码
+
+```C
+IMP class_replaceMethod(Class cls, SEL name, IMP imp, const char *types)
+{
+    if (!cls) return nil;
+
+    mutex_locker_t lock(runtimeLock);
+    // 调用 addMethod 方法，但是此时 addMethod 方法中的 replace 参数传入的是 YES
+    return addMethod(cls, name, imp, types ?: "", YES);
+}
+```
+
+通过上面的 `addMethod` 源码分析
+
+* 当查找到方法已存在，直接通过 _method_setImplementation 方法将传入的方法实现，设置为查找目标方法的实现
+* 当查找到方法不存在，动态添加到当前类中
