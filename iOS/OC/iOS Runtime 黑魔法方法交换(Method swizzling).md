@@ -409,7 +409,7 @@ static method_t *getMethodNoSuper_nolock(Class cls, SEL sel)
     ASSERT(cls->isRealized());
     // fixme nil cls? 
     // fixme nil sel?
-
+    // for 循环遍历，根据传入的 sel 方法进行查找当前类是否有该方法
     auto const methods = cls->data()->methods();
     for (auto mlists = methods.beginLists(),
               end = methods.endLists();
@@ -420,7 +420,9 @@ static method_t *getMethodNoSuper_nolock(Class cls, SEL sel)
         // caller of search_method_list, inlining it turns
         // getMethodNoSuper_nolock into a frame-less function and eliminates
         // any store from this codepath.
+        // 查找传入的方法列表是否有 sel 方法
         method_t *m = search_method_list_inline(*mlists, sel);
+        // 找到了返回
         if (m) return m;
     }
 
@@ -428,9 +430,78 @@ static method_t *getMethodNoSuper_nolock(Class cls, SEL sel)
 }
 ```
 
+```C
+ALWAYS_INLINE static method_t *search_method_list_inline(const method_list_t *mlist, SEL sel)
+{
+    int methodListIsFixedUp = mlist->isFixedUp();
+    int methodListHasExpectedSize = mlist->entsize() == sizeof(method_t);
+    
+    // 根据不同方式进行查找
+    if (fastpath(methodListIsFixedUp && methodListHasExpectedSize)) {
+        // 有序查找
+        return findMethodInSortedMethodList(sel, mlist);
+    } else {
+        // Linear search of unsorted method list
+        // 无序查找
+        for (auto& meth : *mlist) {
+            if (meth.name == sel) return &meth;
+        }
+    }
+
+#if DEBUG
+    // sanity-check negative results
+    if (mlist->isFixedUp()) {
+        for (auto& meth : *mlist) {
+            if (meth.name == sel) {
+                _objc_fatal("linear search worked when binary search did not");
+            }
+        }
+    }
+#endif
+
+    return nil;
+}
+```
 
 
+```C
+// 二分查找方法
+ALWAYS_INLINE static method_t *findMethodInSortedMethodList(SEL key, const method_list_t *list)
+{
+    ASSERT(list);
 
+    const method_t * const first = &list->first;
+    const method_t *base = first;
+    const method_t *probe;
+    uintptr_t keyValue = (uintptr_t)key;
+    uint32_t count;
+    
+    for (count = list->count; count != 0; count >>= 1) {
+        probe = base + (count >> 1);
+        
+        uintptr_t probeValue = (uintptr_t)probe->name;
+        
+        if (keyValue == probeValue) {
+            // `probe` is a match.
+            // Rewind looking for the *first* occurrence of this value.
+            // This is required for correct category overrides.
+            while (probe > first && keyValue == (uintptr_t)probe[-1].name) {
+                probe--;
+            }
+            return (method_t *)probe;
+        }
+        
+        if (keyValue > probeValue) {
+            base = probe + 1;
+            count--;
+        }
+    }
+    
+    return nil;
+}
+```
+
+在使用 `class_addMethod` 添加方法时，只会在当前的类进行查找方法，并不会像 `消息机制` 那样在当前类找不到，就去父类查找。在当前类查找不到，就在当前类动态添加方法并设置实现；如果查找到了就不做操作，返回查找到的方法实现，然后通过取反操作，返回添加结果。
 
 `class_replaceMethod` 函数官方文档描述
 
