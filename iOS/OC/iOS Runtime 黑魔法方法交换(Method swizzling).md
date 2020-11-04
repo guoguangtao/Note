@@ -623,3 +623,44 @@ Method class_getInstanceMethod(Class cls, SEL sel)
 }
 ```
 
+
+```C
+static Method _class_getMethod(Class cls, SEL sel)
+{
+    mutex_locker_t lock(runtimeLock);
+    return getMethod_nolock(cls, sel);
+}
+```
+
+
+```C
+static method_t *getMethod_nolock(Class cls, SEL sel)
+{
+    method_t *m = nil;
+
+    runtimeLock.assertLocked();
+
+    // fixme nil cls?
+    // fixme nil sel?
+
+    ASSERT(cls->isRealized());
+
+    // 遍历当前类是否有该方法，如果没有就遍历父类
+    while (cls  &&  ((m = getMethodNoSuper_nolock(cls, sel))) == nil) {
+        cls = cls->superclass;
+    }
+
+    return m;
+}
+```
+
+
+```C
+Method class_getClassMethod(Class cls, SEL sel)
+{
+    if (!cls  ||  !sel) return nil;
+    // 在这里传入的对象是元类对象
+    return class_getInstanceMethod(cls->getMeta(), sel);
+}
+```
+
