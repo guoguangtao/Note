@@ -293,49 +293,75 @@
 6. 跳转到 `attachCategories` 这个函数中查看
 
     ```C++
-    ...
+    /// cls 原类
+    /// cats_list 分类列表
+    /// cats_count 分类的个数
+    static void attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cats_count, int flags)
     {
-        auto& entry = cats_list[i];
+        if (slowpath(PrintReplacedMethods)) {
+            printReplacements(cls, cats_list, cats_count);
+        }
+        if (slowpath(PrintConnecting)) {
+            _objc_inform("CLASS: attaching %d categories to%s class '%s'%s",
+                        cats_count, (flags & ATTACH_EXISTING) ? " existing" : "",
+                        cls->nameForLogging(), (flags & ATTACH_METACLASS) ? " (meta)" : "");
+        }
+        constexpr uint32_t ATTACH_BUFSIZ = 64;
+        method_list_t   *mlists[ATTACH_BUFSIZ];
+        property_list_t *proplists[ATTACH_BUFSIZ];
+        protocol_list_t *protolists[ATTACH_BUFSIZ];
 
-        // 方法列表
-        method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
-        if (mlist) {
-            if (mcount == ATTACH_BUFSIZ) {
-                //
-                prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
-                rwe->methods.attachLists(mlists, mcount);
-                mcount = 0;
+        uint32_t mcount = 0;
+        uint32_t propcount = 0;
+        uint32_t protocount = 0;
+        bool fromBundle = NO;
+        bool isMeta = (flags & ATTACH_METACLASS);
+        auto rwe = cls->data()->extAllocIfNeeded();
+
+        for (uint32_t i = 0; i < cats_count; i++) {
+            auto& entry = cats_list[i];
+
+            method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
+            if (mlist) {
+                if (mcount == ATTACH_BUFSIZ) {
+                    prepareMethodLists(cls, mlists, mcount, NO, fromBundle);
+                    rwe->methods.attachLists(mlists, mcount);
+                    mcount = 0;
+                }
+                mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
+                fromBundle |= entry.hi->isBundle();
             }
-            mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
-            fromBundle |= entry.hi->isBundle();
+
+            property_list_t *proplist =
+                entry.cat->propertiesForMeta(isMeta, entry.hi);
+            if (proplist) {
+                if (propcount == ATTACH_BUFSIZ) {
+                    rwe->properties.attachLists(proplists, propcount);
+                    propcount = 0;
+                }
+                proplists[ATTACH_BUFSIZ - ++propcount] = proplist;
+            }
+
+            protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
+            if (protolist) {
+                if (protocount == ATTACH_BUFSIZ) {
+                    rwe->protocols.attachLists(protolists, protocount);
+                    protocount = 0;
+                }
+                protolists[ATTACH_BUFSIZ - ++protocount] = protolist;
+            }
         }
 
-        // 属性列表
-        property_list_t *proplist =
-            entry.cat->propertiesForMeta(isMeta, entry.hi);
-        if (proplist) {
-            if (propcount == ATTACH_BUFSIZ) {
-                rwe->properties.attachLists(proplists, propcount);
-                propcount = 0;
-            }
-            proplists[ATTACH_BUFSIZ - ++propcount] = proplist;
+        if (mcount > 0) {
+            prepareMethodLists(cls, mlists + ATTACH_BUFSIZ - mcount, mcount, NO, fromBundle);
+            rwe->methods.attachLists(mlists + ATTACH_BUFSIZ - mcount, mcount);
+            if (flags & ATTACH_EXISTING) flushCaches(cls);
         }
 
-        // 协议列表
-        protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
-        if (protolist) {
-            if (protocount == ATTACH_BUFSIZ) {
-                rwe->protocols.attachLists(protolists, protocount);
-                protocount = 0;
-            }
-            protolists[ATTACH_BUFSIZ - ++protocount] = protolist;
-        }
+        rwe->properties.attachLists(proplists + ATTACH_BUFSIZ - propcount, propcount);
+
+        rwe->protocols.attachLists(protolists + ATTACH_BUFSIZ - protocount, protocount);
     }
-    ...
     ```
-
-
-
-
 
 
