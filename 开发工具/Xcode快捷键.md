@@ -101,6 +101,17 @@ Command + Alt + Shift + ←
 ###### 取消全部折叠
 Command + Alt + Shift + →
 
+###### 快速打开
+Command + Shift + O 快速搜索浏览文件、类、算法以及函数等
+
+###### 跳转到方法
+
+Control + 6 在某个类中快速跳转到某个方法
+
+###### 范围编辑
+
+Command + Control + E
+
 
 
 ###### 调试
