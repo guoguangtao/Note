@@ -61,6 +61,9 @@ Ctrl + F
 ###### 后移光标
 Ctrl + B
 
+###### 多行光标
+Shift + Control + Click / ⇧ + ⌃ + click
+
 ###### 移动光标到上一行
 Ctrl + P
 
