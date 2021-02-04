@@ -138,6 +138,8 @@
  6.删除分支：git branch -d <name>
  
  7.删除远程分支：$ git push origin --delete <branchName>
+ 
+ 8. 切换远程分支 git checkout -b 本地分支名称 origin/远程分支名称
  */
 27.$ git branch -d dev
 
